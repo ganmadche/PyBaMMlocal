@@ -8,6 +8,8 @@ import unittest
 import json
 import pybamm
 import copy
+import numpy as np
+import pytest
 
 
 class TestBPX(TestCase):
@@ -107,28 +109,51 @@ class TestBPX(TestCase):
         }
 
     def test_bpx(self):
-        bpx_obj = copy.copy(self.base)
+        bpx_objs = [
+            {
+                **copy.deepcopy(self.base),
+                "Parameterisation": {
+                    **copy.deepcopy(self.base["Parameterisation"]),
+                    "Negative electrode": {
+                        **copy.deepcopy(
+                            self.base["Parameterisation"]["Negative electrode"]
+                        ),
+                        "Diffusivity [m2.s-1]": "8.3e-13 * exp(-13.4 * x) + 9.6e-15",  # new diffusivity
+                    },
+                },
+            },
+            copy.copy(self.base),
+        ]
+
+        model = pybamm.lithium_ion.DFN()
+        experiment = pybamm.Experiment(
+            [
+                "Discharge at C/5 for 1 hour",
+            ]
+        )
 
         filename = "tmp.json"
-        with tempfile.NamedTemporaryFile(
-            suffix=filename, delete=False, mode="w"
-        ) as tmp:
-            # write to a tempory file so we can
-            # get the source later on using inspect.getsource
-            # (as long as the file still exists)
-            json.dump(bpx_obj, tmp)
-            tmp.flush()
+        sols = []
+        for obj in bpx_objs:
+            with tempfile.NamedTemporaryFile(
+                suffix=filename, delete=False, mode="w"
+            ) as tmp:
+                # write to a temporary file so we can
+                # get the source later on using inspect.getsource
+                # (as long as the file still exists)
+                json.dump(obj, tmp)
+                tmp.flush()
 
-            pv = pybamm.ParameterValues.create_from_bpx(tmp.name)
+                pv = pybamm.ParameterValues.create_from_bpx(tmp.name)
+                sim = pybamm.Simulation(
+                    model, parameter_values=pv, experiment=experiment
+                )
+                sols.append(sim.solve())
 
-            model = pybamm.lithium_ion.DFN()
-            experiment = pybamm.Experiment(
-                [
-                    "Discharge at C/5 for 1 hour",
-                ]
+        with pytest.raises(AssertionError):
+            np.testing.assert_allclose(
+                sols[0]["Voltage [V]"].data, sols[1]["Voltage [V]"].data, atol=1e-7
             )
-            sim = pybamm.Simulation(model, parameter_values=pv, experiment=experiment)
-            sim.solve()
 
     def test_constant_functions(self):
         bpx_obj = copy.copy(self.base)
@@ -171,7 +196,7 @@ class TestBPX(TestCase):
                 self.assertEqual(p_vals[0], p_vals[1])
 
             for electrode in ["Negative", "Positive"]:
-                D = param[f"{electrode} electrode diffusivity [m2.s-1]"]
+                D = param[f"{electrode} particle diffusivity [m2.s-1]"]
                 dUdT = param[f"{electrode} electrode OCP entropic change [V.K-1]"]
                 check_constant_output(D)
                 check_constant_output(dUdT)
@@ -227,7 +252,7 @@ class TestBPX(TestCase):
             D = param["Electrolyte diffusivity [m2.s-1]"](c, 298.15)
             self.assertIsInstance(D, pybamm.Interpolant)
             for electrode in ["Negative", "Positive"]:
-                D = param[f"{electrode} electrode diffusivity [m2.s-1]"](c, 298.15)
+                D = param[f"{electrode} particle diffusivity [m2.s-1]"](c, 298.15)
                 self.assertIsInstance(D, pybamm.Interpolant)
                 OCP = param[f"{electrode} electrode OCP [V]"](c)
                 self.assertIsInstance(OCP, pybamm.Interpolant)
@@ -281,8 +306,8 @@ class TestBPX(TestCase):
         param_keys = [
             "Electrolyte conductivity [S.m-1]",
             "Electrolyte diffusivity [m2.s-1]",
-            "Negative electrode diffusivity [m2.s-1]",
-            "Positive electrode diffusivity [m2.s-1]",
+            "Negative particle diffusivity [m2.s-1]",
+            "Positive particle diffusivity [m2.s-1]",
             "Positive electrode exchange-current density [A.m-2]",
             "Negative electrode exchange-current density [A.m-2]",
         ]
@@ -290,8 +315,8 @@ class TestBPX(TestCase):
         Ea_keys = [
             "Electrolyte conductivity activation energy [J.mol-1]",
             "Electrolyte diffusivity activation energy [J.mol-1]",
-            "Negative electrode diffusivity activation energy [J.mol-1]",
-            "Positive electrode diffusivity activation energy [J.mol-1]",
+            "Negative particle diffusivity activation energy [J.mol-1]",
+            "Positive particle diffusivity activation energy [J.mol-1]",
             "Positive electrode reaction rate constant activation energy [J.mol-1]",
             "Negative electrode reaction rate constant activation energy [J.mol-1]",
         ]
