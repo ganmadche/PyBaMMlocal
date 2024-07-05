@@ -435,7 +435,7 @@ class ParticleLithiumIonParameters(BaseParameters):
         self.c_ec_0 = pybamm.Parameter(
             f"{pref}EC initial concentration in electrolyte [mol.m-3]"
         )
-        self.D_ec = pybamm.Parameter(f"{pref}EC diffusivity [m2.s-1]")
+        #self.D_ec = pybamm.Parameter(f"{pref}EC diffusivity [m2.s-1]")
         self.k_sei = pybamm.Parameter(f"{pref}SEI kinetic rate constant [m.s-1]")
         self.U_sei = pybamm.Parameter(f"{pref}SEI open-circuit potential [V]")
 
@@ -562,6 +562,17 @@ class ParticleLithiumIonParameters(BaseParameters):
             "diffusivity [m2.s-1]",
             inputs,
         )
+    
+    def D_ec(self, T):
+        """
+        EC solvent diffusion for SEI EC reaction limited formation;
+        """
+        pref = self.phase_prefactor
+        
+        return pybamm.FunctionParameter(
+            f"{pref}EC diffusivity [m2.s-1]", {"Temperature [K]": T},
+
+        ) 
 
     def j0(self, c_e, c_s_surf, T, lithiation=None):
         """Dimensional exchange-current density [A.m-2]"""
