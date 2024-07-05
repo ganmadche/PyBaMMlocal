@@ -157,7 +157,7 @@ class SEIGrowth(BaseModel):
             #  c_ec = c_0 - L * k_exp() / D / (1 + L * k_exp() / D)
             #       = c_0 / (1 + L * k_exp() / D)
             k_exp = phase_param.k_sei * pybamm.exp(-alpha_SEI * F_RT * eta_SEI)
-            L_over_D = L_sei / phase_param.D_ec
+            L_over_D = L_sei / phase_param.D_ec(T)
             c_0 = phase_param.c_ec_0
             j_sei = -param.F * c_0 * k_exp / (1 + L_over_D * k_exp)
             c_ec = c_0 / (1 + L_over_D * k_exp)
