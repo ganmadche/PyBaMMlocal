@@ -1,12 +1,10 @@
 #
 # Tests for the basic lithium-ion models
 #
-from tests import TestCase
 import pybamm
-import unittest
 
 
-class TestBasicModels(TestCase):
+class TestBasicModels:
     def test_dfn_well_posed(self):
         model = pybamm.lithium_ion.BasicDFN()
         model.check_well_posedness()
@@ -24,12 +22,6 @@ class TestBasicModels(TestCase):
         model = pybamm.lithium_ion.BasicDFNComposite()
         model.check_well_posedness()
 
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()
+    def test_dfn_2d(self):
+        model = pybamm.lithium_ion.BasicDFN2D()
+        model.check_well_posedness()

@@ -1,21 +1,13 @@
 #
 # Tests for the half-cell lithium-ion SPM model
 #
-from tests import TestCase
+import pytest
+
 import pybamm
-import unittest
 from tests import BaseIntegrationTestLithiumIonHalfCell
 
 
-class TestSPMHalfCell(BaseIntegrationTestLithiumIonHalfCell, TestCase):
-    def setUp(self):
+class TestSPMHalfCell(BaseIntegrationTestLithiumIonHalfCell):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         self.model = pybamm.lithium_ion.SPM
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    unittest.main()

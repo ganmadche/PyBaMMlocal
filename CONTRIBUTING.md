@@ -38,13 +38,13 @@ We use [GIT](https://en.wikipedia.org/wiki/Git) and [GitHub](https://en.wikipedi
 2. Create a [branch](https://help.github.com/articles/creating-and-deleting-branches-within-your-repository/) of this repo (ideally on your own [fork](https://help.github.com/articles/fork-a-repo/)), where all changes will be made
 3. Download the source code onto your local system, by [cloning](https://help.github.com/articles/cloning-a-repository/) the repository (or your fork of the repository).
 4. [Install](https://docs.pybamm.org/en/latest/source/user_guide/installation/install-from-source.html) PyBaMM with the developer options.
-5. [Test](#testing) if your installation worked, using the test script: `$ python run-tests.py --unit`.
+5. [Test](#testing) if your installation worked, using pytest: `$ pytest -m unit`.
 
 You now have everything you need to start making changes!
 
 ### B. Writing your code
 
-6. PyBaMM is developed in [Python](https://www.python.org)), and makes heavy use of [NumPy](https://numpy.org/) (see also [NumPy for MatLab users](https://numpy.org/doc/stable/user/numpy-for-matlab-users.html) and [Python for R users](https://www.rebeccabarter.com/blog/2023-09-11-from_r_to_python)).
+6. PyBaMM is developed in [Python](https://www.python.org), and makes heavy use of [NumPy](https://numpy.org/).
 7. Make sure to follow our [coding style guidelines](#coding-style-guidelines).
 8. Commit your changes to your branch with [useful, descriptive commit messages](https://chris.beams.io/posts/git-commit/): Remember these are
    publicly visible and should still make sense a few months ahead in time.
@@ -68,7 +68,7 @@ PyBaMM follows the [PEP8 recommendations](https://www.python.org/dev/peps/pep-00
 
 ### Ruff
 
-We use [ruff](https://github.com/charliermarsh/ruff) to check our PEP8 adherence. To try this on your system, navigate to the PyBaMM directory in a console and type
+We use [ruff](https://github.com/astral-sh/ruff) to check our PEP8 adherence. To try this on your system, navigate to the PyBaMM directory in a console and type
 
 ```bash
 python -m pip install pre-commit
@@ -116,8 +116,8 @@ PyBaMM provides a utility function `import_optional_dependency`, to check for th
 
 Optional dependencies should never be imported at the module level, but always inside methods. For example:
 
-```
-def use_pybtex(x,y,z):
+```python
+def use_pybtex(x, y, z):
     pybtex = import_optional_dependency("pybtex")
     ...
 ```
@@ -149,9 +149,13 @@ The `test_optional_dependencies` function extracts `pybamm` mandatory distributi
 
 ## Testing
 
-All code requires testing. We use the [unittest](https://docs.python.org/3.3/library/unittest.html) package for our tests. (These tests typically just check that the code runs without error, and so, are more _debugging_ than _testing_ in a strict sense. Nevertheless, they are very useful to have!)
+All code requires testing. We use the [pytest](https://docs.pytest.org/en/stable/) package for our tests. (These tests typically just check that the code runs without error, and so, are more _debugging_ than _testing_ in a strict sense. Nevertheless, they are very useful to have!)
 
-We also use [pytest](https://docs.pytest.org/en/latest/) along with the [nbmake](https://github.com/treebeardtech/nbmake) and the [pytest-xdist](https://pypi.org/project/pytest-xdist/) plugins to test the example notebooks.
+We use following plugins for various needs:
+
+[nbmake](https://github.com/treebeardtech/nbmake/) : plugins to test the example notebooks.
+
+[pytest-xdist](https://pypi.org/project/pytest-xdist/) : plugins to run tests in parallel.
 
 If you have `nox` installed, to run unit tests, type
 
@@ -162,14 +166,14 @@ nox -s unit
 else, type
 
 ```bash
-python run-tests.py --unit
+pytest -m unit
 ```
 
 ### Writing tests
 
 Every new feature should have its own test. To create ones, have a look at the `test` directory and see if there's a test for a similar method. Copy-pasting this is a good way to start.
 
-Next, add some simple (and speedy!) tests of your main features. If these run without exceptions that's a good start! Next, check the output of your methods using any of these [assert methods](https://docs.python.org/3.3/library/unittest.html#assert-methods).
+Next, add some simple (and speedy!) tests of your main features. If these run without exceptions that's a good start! Next, check the output of your methods using [assert statements](https://docs.pytest.org/en/7.1.x/how-to/assert.html).
 
 ### Running more tests
 
@@ -178,6 +182,11 @@ If you want to check integration tests as well as unit tests, type
 
 ```bash
 nox -s tests
+```
+or, alternatively, you can use posargs to pass the path to the test to `nox`. For example:
+
+```bash
+nox -s tests -- tests/unit/test_plotting/test_quick_plot.py::TestQuickPlot::test_simple_ode_model
 ```
 
 When you commit anything to PyBaMM, these checks will also be run automatically (see [infrastructure](#infrastructure)).
@@ -193,7 +202,7 @@ nox -s examples
 Alternatively, you may use `pytest` directly with the `--nbmake` flag:
 
 ```bash
-pytest --nbmake
+pytest --nbmake docs/source/examples/
 ```
 
 which runs all the notebooks in the `docs/source/examples/notebooks/` folder in parallel by default, using the `pytest-xdist` plugin.
@@ -245,19 +254,19 @@ This also means that, if you can't fix the bug yourself, it will be much easier 
 1. Run individual test scripts instead of the whole test suite:
 
    ```bash
-   python tests/unit/path/to/test
+   pytest tests/unit/path/to/test
    ```
 
    You can also run an individual test from a particular script, e.g.
 
    ```bash
-   python tests/unit/test_quick_plot.py TestQuickPlot.test_failure
+   pytest tests/unit/test_plotting/test_quick_plot.py::TestQuickPlot::test_simple_ode_model
    ```
 
    If you want to run several, but not all, the tests from a script, you can restrict which tests are run from a particular script by using the skipping decorator:
 
    ```python
-   @unittest.skip("")
+   @pytest.mark.skip("")
    def test_bit_of_code(self):
        ...
    ```
@@ -365,7 +374,10 @@ PyBaMM is documented in several ways.
 
 First and foremost, every method and every class should have a [docstring](https://www.python.org/dev/peps/pep-0257/) that describes in plain terms what it does, and what the expected input and output is.
 
-These docstrings can be fairly simple, but can also make use of [reStructuredText](http://docutils.sourceforge.net/docs/user/rst/quickref.html), a markup language designed specifically for writing [technical documentation](https://en.wikipedia.org/wiki/ReStructuredText). For example, you can link to other classes and methods by writing ``:class:`pybamm.Model` `` and ``:meth:`run()` ``.
+These docstrings can be fairly simple, but can also make use of
+`reStructuredText`, a markup language designed specifically for writing
+technical documentation. For example, you can link to other classes and methods
+by writing ``:class:`pybamm.Model` `` and ``:meth:`run()` ``.
 
 In addition, we write a (very) small bit of documentation in separate reStructuredText files in the `docs` directory. Most of what these files do is simply import docstrings from the source code. But they also do things like add tables and indexes. If you've added a new class to a module, search the `docs` directory for that module's `.rst` file and add your class (in alphabetical order) to its index. If you've added a whole new module, copy-paste another module's file and add a link to your new file in the appropriate `index.rst` file.
 
@@ -401,7 +413,7 @@ pybamm.print_citations()
 
 to the end of a script will print all citations that were used by that script. This will print BibTeX information to the terminal; passing a filename to `print_citations` will print the BibTeX information to the specified file instead.
 
-When you contribute code to PyBaMM, you can add your own papers that you would like to be cited if that code is used. First, add the BibTeX for your paper to [CITATIONS.bib](https://github.com/pybamm-team/PyBaMM/blob/develop/pybamm/CITATIONS.bib). Then, add the line
+When you contribute code to PyBaMM, you can add your own papers that you would like to be cited if that code is used. First, add the BibTeX for your paper to [CITATIONS.bib](https://github.com/pybamm-team/PyBaMM/blob/develop/src/pybamm/CITATIONS.bib). Then, add the line
 
 ```python3
 pybamm.citations.register("your_paper_bibtex_identifier")
@@ -413,17 +425,12 @@ wherever code is called that uses that citation (for example, in functions or in
 
 ### Installation
 
-Installation of PyBaMM and its dependencies is handled via [pip](https://pip.pypa.io/en/stable/) and [setuptools](http://setuptools.readthedocs.io/). It uses `CMake` to compile C++ extensions using [`pybind11`](https://pybind11.readthedocs.io/en/stable/) and [`casadi`](https://web.casadi.org/). The installation process is described in detail in the [source installation](https://docs.pybamm.org/en/latest/source/user_guide/installation/install-from-source.html) page and is configured through the `CMakeLists.txt` file.
+Installation of PyBaMM and its dependencies is handled via [pip](https://pip.pypa.io/en/stable/)
 
 Configuration files:
-
 ```
-setup.py
 pyproject.toml
-MANIFEST.in
 ```
-
-Note: `MANIFEST.in` is used to include and exclude non-Python files and auxiliary package data for PyBaMM when distributing it. If a file is not included in `MANIFEST.in`, it will not be included in the source distribution (SDist) and subsequently not be included in the binary distribution (wheel).
 
 ### Continuous Integration using GitHub Actions
 
@@ -459,8 +466,8 @@ Editable notebooks are made available using [Google Colab](https://colab.researc
 
 GitHub does some magic with particular filenames. In particular:
 
-- The first page people see when they go to [our GitHub page](https://github.com/pybamm-team/PyBaMM) displays the contents of [README.md](https://github.com/pybamm-team/PyBaMM/blob/develop/README.md), which is written in the [Markdown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) format. Some guidelines can be found [here](https://help.github.com/articles/about-readmes/).
-- The license for using PyBaMM is stored in [LICENSE](https://github.com/pybamm-team/PyBaMM/blob/develop/LICENSE.txt), and [automatically](https://help.github.com/articles/adding-a-license-to-a-repository/) linked to by GitHub.
+- The first page people see when they go to [our GitHub page](https://github.com/pybamm-team/PyBaMM) displays the contents of [README.md](https://github.com/pybamm-team/PyBaMM/blob/develop/README.md), which is written in the [Markdown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) format. Some guidelines can be found [here](https://docs.github.com/articles/about-readmes/).
+- The license for using PyBaMM is stored in [LICENSE](https://github.com/pybamm-team/PyBaMM/blob/develop/LICENSE.txt), and [automatically](https://docs.github.com/articles/adding-a-license-to-a-repository/) linked to by GitHub.
 - This file, [CONTRIBUTING.md](https://github.com/pybamm-team/PyBaMM/blob/develop/CONTRIBUTING.md) is recognised as the contribution guidelines and a link is [automatically](https://github.com/blog/1184-contributing-guidelines) displayed when new issues or pull requests are created.
 
 ## Acknowledgements

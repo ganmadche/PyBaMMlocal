@@ -1,16 +1,15 @@
-import pybamm
-import unittest
-from tests import get_mesh_for_testing
-from tests import TestCase
-import sys
 import numpy as np
+import pytest
 
-if pybamm.have_jax():
+import pybamm
+from tests import get_mesh_for_testing
+
+if pybamm.has_jax():
     import jax
 
 
-@unittest.skipIf(not pybamm.have_jax(), "jax or jaxlib is not installed")
-class TestJaxBDFSolver(TestCase):
+@pytest.mark.skipif(not pybamm.has_jax(), reason="jax or jaxlib is not installed")
+class TestJaxBDFSolver:
     def test_solver_(self):  # Trailing _ manipulates the random seed
         # Create model
         model = pybamm.BaseModel()
@@ -113,7 +112,7 @@ class TestJaxBDFSolver(TestCase):
         grad_solve_bdf = jax.jit(jax.grad(solve_bdf))
         grad_bdf = grad_solve_bdf(rate)
 
-        self.assertAlmostEqual(grad_bdf, grad_num, places=3)
+        assert grad_bdf == pytest.approx(grad_num, abs=0.001)
 
     def test_mass_matrix_with_sensitivities(self):
         # Solve
@@ -146,7 +145,7 @@ class TestJaxBDFSolver(TestCase):
         grad_solve_bdf = jax.jit(jax.grad(solve_bdf))
         grad_bdf = grad_solve_bdf(rate)
 
-        self.assertAlmostEqual(grad_bdf, grad_num, places=3)
+        assert grad_bdf == pytest.approx(grad_num, abs=0.001)
 
     def test_solver_with_inputs(self):
         # Create model
@@ -176,12 +175,3 @@ class TestJaxBDFSolver(TestCase):
         )
 
         np.testing.assert_allclose(y[:, 0].reshape(-1), np.exp(-0.1 * t_eval))
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()

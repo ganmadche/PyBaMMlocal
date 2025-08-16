@@ -1,18 +1,18 @@
 #
 # Tests for the jacobian methods for two-dimensional objects
 #
-from tests import TestCase
-import pybamm
 
 import numpy as np
-import unittest
+import pytest
 from scipy.sparse import eye
+
+import pybamm
 from tests import (
     get_1p1d_discretisation_for_testing,
 )
 
 
-class TestJacobian(TestCase):
+class TestJacobian:
     def test_linear(self):
         y = pybamm.StateVector(slice(0, 8))
         u = pybamm.StateVector(slice(0, 2), slice(4, 6))
@@ -82,7 +82,7 @@ class TestJacobian(TestCase):
         np.testing.assert_array_equal(jacobian, dfunc_dy.toarray())
 
         # when differentiating by independent part of the state vector
-        with self.assertRaises(NotImplementedError):
+        with pytest.raises(NotImplementedError):
             u.jac(v)
 
     def test_nonlinear(self):
@@ -124,7 +124,7 @@ class TestJacobian(TestCase):
             [0, 0, 0, 0, 0, 0, 0, 16777216 * (1 + np.log(8))],
         ]
         dfunc_dy = func.jac(y).evaluate(y=y0)
-        np.testing.assert_array_almost_equal(jacobian, dfunc_dy.toarray())
+        np.testing.assert_allclose(jacobian, dfunc_dy.toarray(), rtol=1e-7, atol=1e-6)
 
         func = u * v
         jacobian = np.array(
@@ -243,13 +243,3 @@ class TestJacobian(TestCase):
         y0 = np.ones(1500)
         jac = conc_disc.jac(y).evaluate(y=y0).toarray()
         np.testing.assert_array_equal(jac, np.eye(1500))
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()

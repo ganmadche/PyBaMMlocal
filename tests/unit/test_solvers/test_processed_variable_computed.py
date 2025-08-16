@@ -1,17 +1,17 @@
 #
 # Tests for the Processed Variable Computed class
 #
-# This class forms a container for variables (and sensitivities) calculted
+# This class forms a container for variables (and sensitivities) calculated
 #  by the idaklu solver, and does not possesses any capability to calculate
 #  values itself since it does not have access to the full state vector
 #
-from tests import TestCase
+
 import casadi
+import numpy as np
+import pytest
+
 import pybamm
 import tests
-
-import numpy as np
-import unittest
 
 
 def to_casadi(var_pybamm, y, inputs=None):
@@ -57,7 +57,6 @@ def process_and_check_2D_variable(
         [var_casadi],
         [y_sol],
         pybamm.Solution(t_sol, y_sol, model, {}),
-        warn=False,
     )
     # NB: ProcessedVariableComputed does not interpret y in the same way as
     #  ProcessedVariable; a better test of equivalence is to check that the
@@ -68,21 +67,20 @@ def process_and_check_2D_variable(
     return y_sol, first_sol, second_sol, t_sol
 
 
-class TestProcessedVariableComputed(TestCase):
+class TestProcessedVariableComputed:
     def test_processed_variable_0D(self):
         # without space
         y = pybamm.StateVector(slice(0, 1))
         var = y
-        var.mesh = None
         t_sol = np.array([0])
         y_sol = np.array([1])[:, np.newaxis]
         var_casadi = to_casadi(var, y_sol)
+        sol = pybamm.Solution(t_sol, y_sol, pybamm.BaseModel(), {})
         processed_var = pybamm.ProcessedVariableComputed(
             [var],
             [var_casadi],
             [y_sol],
-            pybamm.Solution(t_sol, y_sol, pybamm.BaseModel(), {}),
-            warn=False,
+            sol,
         )
         # Assert that the processed variable is the same as the solution
         np.testing.assert_array_equal(processed_var.entries, y_sol[0])
@@ -94,7 +92,23 @@ class TestProcessedVariableComputed(TestCase):
 
         # Check cumtrapz workflow produces no errors
         processed_var.cumtrapz_ic = 1
-        processed_var.initialise_0D()
+        processed_var.entries
+
+        # check _update
+        t_sol2 = np.array([1])
+        y_sol2 = np.array([2])[:, np.newaxis]
+        var_casadi = to_casadi(var, y_sol2)
+        sol_2 = pybamm.Solution(t_sol2, y_sol2, pybamm.BaseModel(), {})
+        processed_var2 = pybamm.ProcessedVariableComputed(
+            [var],
+            [var_casadi],
+            [y_sol2],
+            sol_2,
+        )
+
+        comb_sol = sol + sol_2
+        comb_var = processed_var.update(processed_var2, comb_sol)
+        np.testing.assert_array_equal(comb_var.entries, np.append(y_sol, y_sol2))
 
     # check empty sensitivity works
     def test_processed_variable_0D_no_sensitivity(self):
@@ -102,7 +116,6 @@ class TestProcessedVariableComputed(TestCase):
         t = pybamm.t
         y = pybamm.StateVector(slice(0, 1))
         var = t * y
-        var.mesh = None
         t_sol = np.linspace(0, 1)
         y_sol = np.array([np.linspace(0, 5)])
         var_casadi = to_casadi(var, y_sol)
@@ -111,18 +124,16 @@ class TestProcessedVariableComputed(TestCase):
             [var_casadi],
             [y_sol],
             pybamm.Solution(t_sol, y_sol, pybamm.BaseModel(), {}),
-            warn=False,
         )
 
         # test no inputs (i.e. no sensitivity)
-        self.assertDictEqual(processed_var.sensitivities, {})
+        assert processed_var.sensitivities == {}
 
         # with parameter
         t = pybamm.t
         y = pybamm.StateVector(slice(0, 1))
         a = pybamm.InputParameter("a")
         var = t * y * a
-        var.mesh = None
         t_sol = np.linspace(0, 1)
         y_sol = np.array([np.linspace(0, 5)])
         inputs = {"a": np.array([1.0])}
@@ -132,11 +143,10 @@ class TestProcessedVariableComputed(TestCase):
             [var_casadi],
             [y_sol],
             pybamm.Solution(t_sol, y_sol, pybamm.BaseModel(), inputs),
-            warn=False,
         )
 
         # test no sensitivity raises error
-        self.assertIsNone(processed_var.sensitivities)
+        assert processed_var.sensitivities is None
 
     def test_processed_variable_1D(self):
         var = pybamm.Variable("var", domain=["negative electrode", "separator"])
@@ -157,7 +167,6 @@ class TestProcessedVariableComputed(TestCase):
             [var_casadi],
             [y_sol],
             sol,
-            warn=False,
         )
 
         # Ordering from idaklu with output_variables set is different to
@@ -165,7 +174,9 @@ class TestProcessedVariableComputed(TestCase):
         y_sol = y_sol.reshape((y_sol.shape[1], y_sol.shape[0])).transpose()
         np.testing.assert_array_equal(processed_var.entries, y_sol)
         np.testing.assert_array_equal(processed_var.entries, processed_var.data)
-        np.testing.assert_array_almost_equal(processed_var(t_sol, x_sol), y_sol)
+        np.testing.assert_allclose(
+            processed_var(t_sol, x_sol), y_sol, rtol=1e-7, atol=1e-6
+        )
 
         # Check unroll function
         np.testing.assert_array_equal(processed_var.unroll(), y_sol)
@@ -175,7 +186,7 @@ class TestProcessedVariableComputed(TestCase):
             processed_var.mesh.edges,
             processed_var.mesh.nodes,
         )
-        processed_var.initialise_1D()
+        processed_var.entries
         processed_var.mesh.nodes, processed_var.mesh.edges = (
             processed_var.mesh.edges,
             processed_var.mesh.nodes,
@@ -192,7 +203,7 @@ class TestProcessedVariableComputed(TestCase):
         ]
         for domain in domain_list:
             processed_var.domain[0] = domain
-            processed_var.initialise_1D()
+            processed_var.entries
 
     def test_processed_variable_1D_unknown_domain(self):
         x = pybamm.SpatialVariable("x", domain="SEI layer", coord_sys="cartesian")
@@ -220,7 +231,61 @@ class TestProcessedVariableComputed(TestCase):
         c = pybamm.StateVector(slice(0, var_pts[x]), domain=["SEI layer"])
         c.mesh = mesh["SEI layer"]
         c_casadi = to_casadi(c, y_sol)
-        pybamm.ProcessedVariableComputed([c], [c_casadi], [y_sol], solution, warn=False)
+        pybamm.ProcessedVariableComputed([c], [c_casadi], [y_sol], solution)
+
+    def test_processed_variable_1D_update(self):
+        # variable 1
+        var = pybamm.Variable("var", domain=["negative electrode", "separator"])
+        x = pybamm.SpatialVariable("x", domain=["negative electrode", "separator"])
+
+        disc = tests.get_discretisation_for_testing()
+        disc.set_variable_slices([var])
+        x_sol1 = disc.process_symbol(x).entries[:, 0]
+        var_sol1 = disc.process_symbol(var)
+        t_sol1 = np.linspace(0, 1)
+        y_sol1 = np.ones_like(x_sol1)[:, np.newaxis] * np.linspace(0, 5)
+
+        var_casadi1 = to_casadi(var_sol1, y_sol1)
+        sol1 = pybamm.Solution(t_sol1, y_sol1, pybamm.BaseModel(), {})
+        processed_var1 = pybamm.ProcessedVariableComputed(
+            [var_sol1],
+            [var_casadi1],
+            [y_sol1],
+            sol1,
+        )
+
+        # variable 2 -------------------
+        var2 = pybamm.Variable("var2", domain=["negative electrode", "separator"])
+        z = pybamm.SpatialVariable("z", domain=["negative electrode", "separator"])
+
+        disc = tests.get_discretisation_for_testing()
+        disc.set_variable_slices([var2])
+        z_sol2 = disc.process_symbol(z).entries[:, 0]
+        var_sol2 = disc.process_symbol(var2)
+        t_sol2 = np.linspace(2, 3)
+        y_sol2 = np.ones_like(z_sol2)[:, np.newaxis] * np.linspace(5, 1)
+
+        var_casadi2 = to_casadi(var_sol2, y_sol2)
+        sol2 = pybamm.Solution(t_sol2, y_sol2, pybamm.BaseModel(), {})
+        var_2 = pybamm.ProcessedVariableComputed(
+            [var_sol2],
+            [var_casadi2],
+            [y_sol2],
+            sol2,
+        )
+
+        comb_sol = sol1 + sol2
+        comb_var = processed_var1.update(var_2, comb_sol)
+
+        # Ordering from idaklu with output_variables set is different to
+        # the full solver
+        y_sol1 = y_sol1.reshape((y_sol1.shape[1], y_sol1.shape[0])).transpose()
+        y_sol2 = y_sol2.reshape((y_sol2.shape[1], y_sol2.shape[0])).transpose()
+
+        np.testing.assert_array_equal(
+            comb_var.entries, np.concatenate((y_sol1, y_sol2), axis=1)
+        )
+        np.testing.assert_array_equal(comb_var.entries, comb_var.data)
 
     def test_processed_variable_2D_x_r(self):
         var = pybamm.Variable(
@@ -330,13 +395,13 @@ class TestProcessedVariableComputed(TestCase):
         x_s_edge.mesh = disc.mesh["separator"]
         x_s_edge.secondary_mesh = disc.mesh["current collector"]
         x_s_casadi = to_casadi(x_s_edge, y_sol)
-        processed_x_s_edge = pybamm.ProcessedVariable(
+        processed_x_s_edge = pybamm.process_variable(
+            "test",
             [x_s_edge],
             [x_s_casadi],
             pybamm.Solution(
                 t_sol, y_sol, tests.get_base_model_with_battery_geometry(), {}
             ),
-            warn=False,
         )
         np.testing.assert_array_equal(
             x_s_edge.entries.flatten(), processed_x_s_edge.entries[:, :, 0].T.flatten()
@@ -371,7 +436,6 @@ class TestProcessedVariableComputed(TestCase):
             [var_casadi],
             [y_sol],
             pybamm.Solution(t_sol, y_sol, pybamm.BaseModel(), {}),
-            warn=False,
         )
         np.testing.assert_array_equal(
             processed_var.entries,
@@ -384,11 +448,6 @@ class TestProcessedVariableComputed(TestCase):
 
         # Check unroll function (2D)
         np.testing.assert_array_equal(processed_var.unroll(), y_sol.reshape(10, 40, 1))
-
-        # Check unroll function (3D)
-        with self.assertRaises(NotImplementedError):
-            processed_var.dimensions = 3
-            processed_var.unroll()
 
     def test_processed_variable_2D_fixed_t_scikit(self):
         var = pybamm.Variable("var", domain=["current collector"])
@@ -408,41 +467,87 @@ class TestProcessedVariableComputed(TestCase):
             [var_casadi],
             [u_sol],
             pybamm.Solution(t_sol, u_sol, pybamm.BaseModel(), {}),
-            warn=False,
         )
         np.testing.assert_array_equal(
             processed_var.entries, np.reshape(u_sol, [len(y), len(z), len(t_sol)])
         )
 
-    def test_3D_raises_error(self):
+    def test_processed_variable_3D_r_R_x(self):
         var = pybamm.Variable(
             "var",
-            domain=["negative electrode"],
-            auxiliary_domains={"secondary": ["current collector"]},
+            domain=["negative particle"],
+            auxiliary_domains={
+                "secondary": ["negative particle size"],
+                "tertiary": ["negative electrode"],
+            },
+        )
+        disc = tests.get_size_distribution_disc_for_testing(xpts=3, rpts=4, Rpts=5)
+        disc.set_variable_slices([var])
+        x_sol = disc.mesh["negative electrode"].nodes
+        R_sol = disc.mesh["negative particle size"].nodes
+        r_sol = disc.mesh["negative particle"].nodes
+        var_sol = disc.process_symbol(var)
+        t_sol = np.linspace(0, 1, 2)
+        u_sol = np.ones(len(x_sol) * len(R_sol) * len(r_sol))[:, np.newaxis] * t_sol
+
+        var_casadi = to_casadi(var_sol, u_sol)
+        geometry_options = {"options": {"particle size": "distribution"}}
+        model = tests.get_base_model_with_battery_geometry(**geometry_options)
+        processed_var = pybamm.ProcessedVariableComputed(
+            [var_sol],
+            [var_casadi],
+            [u_sol],
+            pybamm.Solution(t_sol, u_sol, model, {}),
         )
 
-        disc = tests.get_2p1d_discretisation_for_testing()
-        disc.set_variable_slices([var])
-        var_sol = disc.process_symbol(var)
-        t_sol = np.array([0, 1, 2])
-        u_sol = np.ones(var_sol.shape[0] * 3)[:, np.newaxis]
-        var_casadi = to_casadi(var_sol, u_sol)
+        # Check shape (prim, sec, ter, time)
+        np.testing.assert_array_equal(
+            processed_var.entries,
+            np.reshape(u_sol, [len(r_sol), len(R_sol), len(x_sol), len(t_sol)]),
+        )
 
-        with self.assertRaisesRegex(NotImplementedError, "Shape not recognized"):
-            pybamm.ProcessedVariableComputed(
-                [var_sol],
-                [var_casadi],
-                [u_sol],
-                pybamm.Solution(t_sol, u_sol, pybamm.BaseModel(), {}),
-                warn=False,
+        # Check unroll function (3D)
+        np.testing.assert_array_equal(processed_var.unroll(), u_sol.reshape(4, 5, 3, 2))
+
+    @pytest.mark.parametrize("edges_eval", [False, True])
+    def test_processed_variable_3D_x_y_z(self, edges_eval):
+        disc = tests.get_2p1d_discretisation_for_testing(xpts=5, ypts=6, zpts=7)
+        if edges_eval:
+            var_cc = pybamm.Variable("var_cc", domain=["current collector"])
+            var = pybamm.PrimaryBroadcastToEdges(var_cc, ["negative electrode"])
+            x_sol = disc.mesh["negative electrode"].edges
+            disc.set_variable_slices([var_cc])
+        else:
+            var = pybamm.Variable(
+                "var",
+                domain=["negative electrode"],
+                auxiliary_domains={"secondary": ["current collector"]},
             )
+            x_sol = disc.mesh["negative electrode"].nodes
+            disc.set_variable_slices([var])
 
+        Nx = len(x_sol)
+        y_sol = disc.mesh["current collector"].edges["y"]
+        z_sol = disc.mesh["current collector"].edges["z"]
+        var_sol = disc.process_symbol(var)
+        t_sol = np.linspace(0, 1, 2)
+        u_sol = np.ones(len(x_sol) * len(y_sol) * len(z_sol))[:, np.newaxis] * t_sol
 
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
+        var_casadi = to_casadi(var_sol, u_sol)
+        processed_var = pybamm.ProcessedVariableComputed(
+            [var_sol],
+            [var_casadi],
+            [u_sol],
+            pybamm.Solution(t_sol, u_sol, pybamm.BaseModel(), {}),
+        )
 
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()
+        # Check shape (prim, sec, ter, time)
+        np.testing.assert_array_equal(
+            processed_var.entries,
+            np.reshape(u_sol, [len(x_sol), len(y_sol), len(z_sol), len(t_sol)]),
+        )
+
+        # Check unroll function (3D)
+        np.testing.assert_array_equal(
+            processed_var.unroll(), u_sol.reshape(Nx, 6, 7, 2)
+        )

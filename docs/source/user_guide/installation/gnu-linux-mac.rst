@@ -6,7 +6,7 @@ GNU/Linux & macOS
 Prerequisites
 -------------
 
-To use PyBaMM, you must have Python 3.8, 3.9, 3.10, 3.11, or 3.12 installed.
+To use PyBaMM, you must have Python 3.10, 3.11, or 3.12 installed.
 
 .. tab:: Debian-based distributions (Debian, Ubuntu)
 
@@ -43,14 +43,15 @@ User install
 
 We recommend to install PyBaMM within a virtual environment, in order
 not to alter any distribution Python files.
-First, make sure you are using Python 3.8, 3.9, 3.10, 3.11, or 3.12.
+First, make sure you are using Python 3.10, 3.11, or 3.12.
 To create a virtual environment ``env`` within your current directory type:
 
 .. code:: bash
 
    virtualenv env
 
-You can then “activate” the environment using:
+or use any of your preferred environment management tools. You can then “activate”
+the environment using:
 
 .. code:: bash
 
@@ -64,31 +65,30 @@ the environment and go back to your original system, just type:
 
    deactivate
 
-PyBaMM can be installed via pip. On macOS, it is necessary to install the `SUNDIALS <https://computing.llnl.gov/projects/sundials/>`__
+PyBaMM can be installed via ``pip`` or ``conda``.
 library beforehand.
 
-.. tab:: GNU/Linux
-
-   In a terminal, run the following command:
+.. tab:: pip
 
    .. code:: bash
 
       pip install pybamm
 
-.. tab:: macOS
-
-   In a terminal, run the following command:
+.. tab:: conda
 
    .. code:: bash
 
-      pip install pybamm
+      conda install -c conda-forge pybamm-base
 
-PyBaMM’s required dependencies (such as ``numpy``, ``casadi``, etc) will be
-installed automatically when you install PyBaMM using ``pip``.
+PyBaMM’s :ref:`required dependencies <install-required-dependencies>`
+
+(such as ``numpy``, ``casadi``, etc) will be installed automatically when you
+install ``pybamm`` using ``pip`` or ``pybamm-base`` using ``conda``.
 
 For an introduction to virtual environments, see
 (https://realpython.com/python-virtual-environments-a-primer/).
 
+.. _optional-jaxsolver:
 
 Optional - JaxSolver
 ~~~~~~~~~~~~~~~~~~~~
@@ -99,7 +99,9 @@ Users can install ``jax`` and ``jaxlib`` to use the Jax solver.
 
 	  pip install "pybamm[jax]"
 
-The ``pip install "pybamm[jax]"`` command automatically downloads and installs ``pybamm`` and the compatible versions of ``jax`` and ``jaxlib`` on your system. (``pybamm_install_jax`` is deprecated.)
+The ``pip install "pybamm[jax]"`` command automatically downloads and installs ``pybamm`` and the compatible versions of ``jax`` and ``jaxlib`` on your system.
+
+PyBaMM's full `conda-forge distribution <index.rst#installation>`_ (``pybamm``) includes ``jax`` and ``jaxlib`` by default.
 
 Uninstall PyBaMM
 ----------------

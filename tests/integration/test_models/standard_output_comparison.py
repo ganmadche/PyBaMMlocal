@@ -1,8 +1,9 @@
 #
 # Tests comparing model outputs for standard variables
 #
-import pybamm
 import numpy as np
+
+import pybamm
 
 
 class StandardOutputComparison:
@@ -66,6 +67,7 @@ class BaseOutputComparison:
         # Get variable for each model
         model_variables = [solution[var] for solution in self.solutions]
         var0 = model_variables[0]
+        var0.initialise()
 
         spatial_pts = {}
         if var0.dimensions >= 1:

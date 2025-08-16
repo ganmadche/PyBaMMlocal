@@ -1,26 +1,27 @@
 #
 # Tests for the Algebraic Solver class
 #
-from tests import TestCase
-import pybamm
-import unittest
+
 import numpy as np
+import pytest
+
+import pybamm
 from tests import get_discretisation_for_testing
 
 
-class TestAlgebraicSolver(TestCase):
+class TestAlgebraicSolver:
     def test_algebraic_solver_init(self):
         solver = pybamm.AlgebraicSolver(
             method="hybr", tol=1e-4, extra_options={"maxfev": 100}
         )
-        self.assertEqual(solver.method, "hybr")
-        self.assertEqual(solver.extra_options, {"maxfev": 100})
-        self.assertEqual(solver.tol, 1e-4)
+        assert solver.method == "hybr"
+        assert solver.extra_options == {"xtol": 1e-12, "gtol": 1e-12, "maxfev": 100}
+        assert solver.tol == 1e-4
 
         solver.method = "krylov"
-        self.assertEqual(solver.method, "krylov")
+        assert solver.method == "krylov"
         solver.tol = 1e-5
-        self.assertEqual(solver.tol, 1e-5)
+        assert solver.tol == 1e-5
 
     def test_wrong_solver(self):
         # Create model
@@ -31,9 +32,9 @@ class TestAlgebraicSolver(TestCase):
 
         # test errors
         solver = pybamm.AlgebraicSolver()
-        with self.assertRaisesRegex(
+        with pytest.raises(
             pybamm.SolverError,
-            "Cannot use algebraic solver to solve model with time derivatives",
+            match="Cannot use algebraic solver to solve model with time derivatives",
         ):
             solver.solve(model)
 
@@ -58,11 +59,6 @@ class TestAlgebraicSolver(TestCase):
         solution = solver._integrate(model, np.array([0]))
         np.testing.assert_array_equal(solution.y, -2)
 
-        # Relax options and see worse results
-        solver = pybamm.AlgebraicSolver(extra_options={"ftol": 1})
-        solution = solver._integrate(model, np.array([0]))
-        self.assertNotEqual(solution.y, -2)
-
     def test_root_find_fail(self):
         class Model(pybamm.BaseModel):
             y0 = np.array([2])
@@ -81,15 +77,16 @@ class TestAlgebraicSolver(TestCase):
         model = Model()
 
         solver = pybamm.AlgebraicSolver(method="hybr")
-        with self.assertRaisesRegex(
+        with pytest.raises(
             pybamm.SolverError,
-            "Could not find acceptable solution: The iteration is not making",
+            match="Could not find acceptable solution",
         ):
             solver._integrate(model, np.array([0]))
 
         solver = pybamm.AlgebraicSolver()
-        with self.assertRaisesRegex(
-            pybamm.SolverError, "Could not find acceptable solution: solver terminated"
+        with pytest.raises(
+            pybamm.SolverError,
+            match="Could not find acceptable solution",
         ):
             solver._integrate(model, np.array([0]))
 
@@ -117,7 +114,7 @@ class TestAlgebraicSolver(TestCase):
 
         solver = pybamm.AlgebraicSolver()
         solution = solver._integrate(model, np.array([0]))
-        np.testing.assert_array_almost_equal(solution.y, sol)
+        np.testing.assert_allclose(solution.y, sol, rtol=1e-7, atol=1e-6)
 
     def test_model_solver(self):
         # Create model
@@ -171,22 +168,34 @@ class TestAlgebraicSolver(TestCase):
         # Solve
         solver = pybamm.AlgebraicSolver("lsq")
         solution = solver.solve(model)
-        np.testing.assert_array_almost_equal(
-            model.variables["var1"].evaluate(t=None, y=solution.y), sol[:100]
+        np.testing.assert_allclose(
+            model.variables["var1"].evaluate(t=None, y=solution.y),
+            sol[:100],
+            rtol=1e-7,
+            atol=1e-6,
         )
-        np.testing.assert_array_almost_equal(
-            model.variables["var2"].evaluate(t=None, y=solution.y), sol[100:]
+        np.testing.assert_allclose(
+            model.variables["var2"].evaluate(t=None, y=solution.y),
+            sol[100:],
+            rtol=1e-7,
+            atol=1e-6,
         )
 
         # Test without jacobian and with a different method
         model.use_jacobian = False
         solver = pybamm.AlgebraicSolver("lsq__trf")
         solution_no_jac = solver.solve(model)
-        np.testing.assert_array_almost_equal(
-            model.variables["var1"].evaluate(t=None, y=solution_no_jac.y), sol[:100]
+        np.testing.assert_allclose(
+            model.variables["var1"].evaluate(t=None, y=solution_no_jac.y),
+            sol[:100],
+            rtol=1e-7,
+            atol=1e-6,
         )
-        np.testing.assert_array_almost_equal(
-            model.variables["var2"].evaluate(t=None, y=solution_no_jac.y), sol[100:]
+        np.testing.assert_allclose(
+            model.variables["var2"].evaluate(t=None, y=solution_no_jac.y),
+            sol[100:],
+            rtol=1e-7,
+            atol=1e-6,
         )
 
     def test_model_solver_minimize(self):
@@ -206,22 +215,34 @@ class TestAlgebraicSolver(TestCase):
         # Solve
         solver = pybamm.AlgebraicSolver("minimize", tol=1e-8)
         solution = solver.solve(model)
-        np.testing.assert_array_almost_equal(
-            model.variables["var1"].evaluate(t=None, y=solution.y), sol[:100]
+        np.testing.assert_allclose(
+            model.variables["var1"].evaluate(t=None, y=solution.y),
+            sol[:100],
+            rtol=1e-7,
+            atol=1e-6,
         )
-        np.testing.assert_array_almost_equal(
-            model.variables["var2"].evaluate(t=None, y=solution.y), sol[100:]
+        np.testing.assert_allclose(
+            model.variables["var2"].evaluate(t=None, y=solution.y),
+            sol[100:],
+            rtol=1e-7,
+            atol=1e-6,
         )
 
         # Test without jacobian and with a different method
         model.use_jacobian = False
         solver = pybamm.AlgebraicSolver("minimize__BFGS")
         solution_no_jac = solver.solve(model)
-        np.testing.assert_array_almost_equal(
-            model.variables["var1"].evaluate(t=None, y=solution_no_jac.y), sol[:100]
+        np.testing.assert_allclose(
+            model.variables["var1"].evaluate(t=None, y=solution_no_jac.y),
+            sol[:100],
+            rtol=1e-7,
+            atol=1e-6,
         )
-        np.testing.assert_array_almost_equal(
-            model.variables["var2"].evaluate(t=None, y=solution_no_jac.y), sol[100:]
+        np.testing.assert_allclose(
+            model.variables["var2"].evaluate(t=None, y=solution_no_jac.y),
+            sol[100:],
+            rtol=1e-7,
+            atol=1e-6,
         )
 
     def test_model_solver_least_squares_with_bounds(self):
@@ -236,10 +257,11 @@ class TestAlgebraicSolver(TestCase):
         # Solve
         solver = pybamm.AlgebraicSolver("lsq", tol=1e-5)
         solution = solver.solve(model)
-        np.testing.assert_array_almost_equal(
+        np.testing.assert_allclose(
             model.variables["var1"].evaluate(t=None, y=solution.y),
             3 * np.pi / 2,
-            decimal=2,
+            rtol=1e-3,
+            atol=1e-2,
         )
 
     def test_model_solver_minimize_with_bounds(self):
@@ -254,10 +276,11 @@ class TestAlgebraicSolver(TestCase):
         # Solve
         solver = pybamm.AlgebraicSolver("minimize", tol=1e-16)
         solution = solver.solve(model)
-        np.testing.assert_array_almost_equal(
+        np.testing.assert_allclose(
             model.variables["var1"].evaluate(t=None, y=solution.y),
             3 * np.pi / 2,
-            decimal=4,
+            rtol=1e-5,
+            atol=1e-4,
         )
 
     def test_model_solver_with_time(self):
@@ -303,13 +326,3 @@ class TestAlgebraicSolver(TestCase):
         solver = pybamm.AlgebraicSolver()
         solution = solver.solve(model, np.linspace(0, 1, 10), inputs={"value": 7})
         np.testing.assert_array_equal(solution.y, -7)
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()

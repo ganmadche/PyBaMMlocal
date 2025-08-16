@@ -2,13 +2,12 @@
 # Tests for the thermal lithium-ion models produce consistent
 # thermal response
 #
-import pybamm
 import numpy as np
-import unittest
-from tests import TestCase
+
+import pybamm
 
 
-class TestThermal(TestCase):
+class TestThermal:
     def test_consistent_cooling(self):
         "Test the cooling is consistent between the 1D, 1+1D and 2+1D SPMe models"
 
@@ -79,8 +78,10 @@ class TestThermal(TestCase):
         # Solve models
         solutions = {}
         var_pts = {"x_n": 3, "x_s": 3, "x_p": 3, "r_n": 3, "r_p": 3, "y": 5, "z": 5}
+        t_eval = [0, 3500 / 6]
+        t_interp = np.linspace(t_eval[0], t_eval[-1], 100)
         for model_name, model in models.items():
-            solver = pybamm.CasadiSolver(mode="fast")
+            solver = pybamm.IDAKLUSolver(rtol=1e-8, atol=1e-12)
             sim = pybamm.Simulation(
                 model,
                 var_pts=var_pts,
@@ -88,12 +89,11 @@ class TestThermal(TestCase):
                 parameter_values=parameter_values,
                 C_rate=C_rate,
             )
-            t_eval = np.linspace(0, 3500 / 6, 100)
-            sim.solve(t_eval=t_eval)
+            sim.solve(t_eval)
 
             solutions[model_name] = sim.solution[
                 "Volume-averaged cell temperature [K]"
-            ].entries
+            ](t_interp)
 
         # check volume-averaged cell temperature is within
         # 1e-5 relative error
@@ -101,14 +101,83 @@ class TestThermal(TestCase):
         def err(a, b):
             return np.max(np.abs(a - b)) / np.max(np.abs(a))
 
-        self.assertGreater(1e-5, err(solutions["SPMe 1+1D"], solutions["SPMe 2+1D"]))
+        assert 1e-5 > err(solutions["SPMe 1+1D"], solutions["SPMe 2+1D"])
 
+    def test_surface_temperature_models(self):
+        models = {
+            option: pybamm.lithium_ion.SPM(
+                {"thermal": "lumped", "surface temperature": option}
+            )
+            for option in ["lumped", "ambient"]
+        }
 
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
+        parameter_values = pybamm.ParameterValues("Chen2020")
+        parameter_values.update(
+            {
+                "Casing heat capacity [J.K-1]": 30,
+                "Environment thermal resistance [K.W-1]": 10,
+            },
+            check_already_exists=False,
+        )
 
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()
+        sols = {}
+        t_eval = [0, 3600]
+        t_interp = np.linspace(0, 3600, 100)
+        for name, model in models.items():
+            sim = pybamm.Simulation(model, parameter_values=parameter_values)
+            sol = sim.solve(t_eval=t_eval, t_interp=t_interp)
+            sols[name] = sol
+
+        for var in ["Volume-averaged cell temperature [K]", "Surface temperature [K]"]:
+            # ignore first entry as it is the initial condition
+            T_ambient_model = sols["ambient"][var].entries[1:]
+            T_lumped_model = sols["lumped"][var].entries[1:]
+            np.testing.assert_array_less(T_ambient_model, T_lumped_model)
+
+    def test_lumped_contact_resistance(self):
+        # Test that the heating with contact resistance is greater than without
+
+        # load models
+        model_no_contact_resistance = pybamm.lithium_ion.SPMe(
+            {
+                "cell geometry": "arbitrary",
+                "thermal": "lumped",
+                "contact resistance": "false",
+            }
+        )
+        model_contact_resistance = pybamm.lithium_ion.SPMe(
+            {
+                "cell geometry": "arbitrary",
+                "thermal": "lumped",
+                "contact resistance": "true",
+            }
+        )
+        models = [model_no_contact_resistance, model_contact_resistance]
+
+        # parameters
+        parameter_values = pybamm.ParameterValues("Marquis2019")
+        lumped_params = parameter_values.copy()
+        lumped_params_contact_resistance = parameter_values.copy()
+
+        lumped_params_contact_resistance.update(
+            {
+                "Contact resistance [Ohm]": 0.05,
+            }
+        )
+
+        # solve the models
+        params = [lumped_params, lumped_params_contact_resistance]
+        sols = []
+        for model, param in zip(models, params, strict=False):
+            sim = pybamm.Simulation(model, parameter_values=param)
+            sim.solve([0, 3600])
+            sols.append(sim.solution)
+
+        # get the average temperature from each model
+        avg_cell_temp = sols[0]["X-averaged cell temperature [K]"].entries
+        avg_cell_temp_cr = sols[1]["X-averaged cell temperature [K]"].entries
+
+        # check that the cell temperature of the lumped thermal model
+        # with contact resistance is higher than without contact resistance
+        # skip the first entry because they are the same due to initial conditions
+        np.testing.assert_array_less(avg_cell_temp[1:], avg_cell_temp_cr[1:])

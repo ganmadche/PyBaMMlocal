@@ -1,19 +1,21 @@
 #
 # Tests for the Finite Volume Method
 #
-from tests import TestCase
+
+import numpy as np
+import pytest
+from scipy.sparse import eye, kron
+
 import pybamm
 from tests import (
-    get_mesh_for_testing,
-    get_p2d_mesh_for_testing,
     get_1p1d_mesh_for_testing,
+    get_mesh_for_testing,
+    get_mesh_for_testing_symbolic,
+    get_p2d_mesh_for_testing,
 )
-import numpy as np
-from scipy.sparse import kron, eye
-import unittest
 
 
-class TestFiniteVolume(TestCase):
+class TestFiniteVolume:
     def test_node_to_edge_to_node(self):
         # Create discretisation
         mesh = get_mesh_for_testing()
@@ -46,15 +48,46 @@ class TestFiniteVolume(TestCase):
         )
 
         # bad shift key
-        with self.assertRaisesRegex(ValueError, "shift key"):
+        with pytest.raises(ValueError, match="shift key"):
             fin_vol.shift(c, "bad shift key", "arithmetic")
 
-        with self.assertRaisesRegex(ValueError, "shift key"):
+        with pytest.raises(ValueError, match="shift key"):
             fin_vol.shift(c, "bad shift key", "harmonic")
 
         # bad method
-        with self.assertRaisesRegex(ValueError, "method"):
+        with pytest.raises(ValueError, match="method"):
             fin_vol.shift(c, "shift key", "bad method")
+
+    def test_node_to_edge_to_node_symbolic(self):
+        # Create discretisation
+        mesh = get_mesh_for_testing_symbolic()
+        fin_vol = pybamm.FiniteVolume()
+        fin_vol.build(mesh)
+        n = mesh["domain"].npts
+
+        # node to edge
+        c = pybamm.StateVector(slice(0, n), domain=["domain"])
+        y_test = np.ones(n)
+        diffusivity_c_ari = fin_vol.node_to_edge(c, method="arithmetic")
+        np.testing.assert_array_equal(
+            diffusivity_c_ari.evaluate(None, y_test), np.ones((n + 1, 1))
+        )
+        diffusivity_c_har = fin_vol.node_to_edge(c, method="harmonic")
+        np.testing.assert_array_equal(
+            diffusivity_c_har.evaluate(None, y_test), np.ones((n + 1, 1))
+        )
+
+        # edge to node
+        d = pybamm.StateVector(slice(0, n + 1), domain=["domain"])
+        y_test = np.ones(n + 1)
+        diffusivity_d_ari = fin_vol.edge_to_node(d, method="arithmetic")
+        np.testing.assert_array_equal(
+            diffusivity_d_ari.evaluate(None, y_test), np.ones((n, 1))
+        )
+        diffusivity_d_har = fin_vol.edge_to_node(d, method="harmonic")
+        np.testing.assert_array_equal(
+            diffusivity_d_har.evaluate(None, y_test), np.ones((n, 1))
+        )
 
     def test_concatenation(self):
         mesh = get_mesh_for_testing()
@@ -71,7 +104,7 @@ class TestFiniteVolume(TestCase):
         edges = [
             pybamm.Vector(np.ones(mesh[dom].npts + 2), domain=dom) for dom in whole_cell
         ]
-        with self.assertRaisesRegex(pybamm.ShapeError, "child must have size n_nodes"):
+        with pytest.raises(pybamm.ShapeError, match="child must have size n_nodes"):
             fin_vol.concatenation(edges)
 
     def test_discretise_diffusivity_times_spatial_operator(self):
@@ -154,14 +187,14 @@ class TestFiniteVolume(TestCase):
         # macroscale
         x1 = pybamm.SpatialVariable("x", ["negative electrode"])
         x1_disc = disc.process_symbol(x1)
-        self.assertIsInstance(x1_disc, pybamm.Vector)
+        assert isinstance(x1_disc, pybamm.Vector)
         np.testing.assert_array_equal(
             x1_disc.evaluate(), disc.mesh["negative electrode"].nodes[:, np.newaxis]
         )
         # macroscale with concatenation
         x2 = pybamm.SpatialVariable("x", ["negative electrode", "separator"])
         x2_disc = disc.process_symbol(x2)
-        self.assertIsInstance(x2_disc, pybamm.Vector)
+        assert isinstance(x2_disc, pybamm.Vector)
         np.testing.assert_array_equal(
             x2_disc.evaluate(),
             disc.mesh[("negative electrode", "separator")].nodes[:, np.newaxis],
@@ -169,9 +202,32 @@ class TestFiniteVolume(TestCase):
         # microscale
         r = 3 * pybamm.SpatialVariable("r", ["negative particle"])
         r_disc = disc.process_symbol(r)
-        self.assertIsInstance(r_disc, pybamm.Vector)
+        assert isinstance(r_disc, pybamm.Vector)
         np.testing.assert_array_equal(
             r_disc.evaluate(), 3 * disc.mesh["negative particle"].nodes[:, np.newaxis]
+        )
+
+    def test_spatial_variable_symbolic(self):
+        mesh = get_mesh_for_testing_symbolic()
+        spatial_methods = {"domain": pybamm.FiniteVolume()}
+        disc = pybamm.Discretisation(mesh, spatial_methods)
+        x = pybamm.SpatialVariable("x", ["domain"])
+        x_disc = disc.process_symbol(x)
+        assert isinstance(x_disc, pybamm.Vector)
+        np.testing.assert_array_equal(
+            x_disc.evaluate(),
+            mesh["domain"].nodes[:, np.newaxis] * mesh["domain"].length,
+        )
+
+        # test spatial variable on edges
+        x = pybamm.SpatialVariable("x", ["domain"])
+        disc = pybamm.Discretisation(mesh, spatial_methods)
+        x._evaluates_on_edges = lambda _: True
+        x_edges_disc = disc.process_symbol(x)
+        assert isinstance(x_edges_disc, pybamm.Vector)
+        np.testing.assert_array_equal(
+            x_edges_disc.evaluate(),
+            mesh["domain"].edges[:, np.newaxis] * mesh["domain"].length,
         )
 
     def test_mass_matrix_shape(self):
@@ -258,7 +314,7 @@ class TestFiniteVolume(TestCase):
         jacobian = eqn_jac.evaluate(y=y_test)
         grad_matrix = spatial_method.gradient_matrix(
             whole_cell, {"primary": whole_cell}
-        ).entries
+        ).evaluate()
         np.testing.assert_allclose(jacobian.toarray()[1:-1], grad_matrix.toarray())
         np.testing.assert_allclose(
             jacobian.toarray()[0, 0], grad_matrix.toarray()[0][0] * -2
@@ -326,8 +382,8 @@ class TestFiniteVolume(TestCase):
         c_s_p_surf = pybamm.surf(c_s_p)
         c_s_n_surf_disc = disc.process_symbol(c_s_n_surf)
         c_s_p_surf_disc = disc.process_symbol(c_s_p_surf)
-        self.assertEqual(c_s_n_surf_disc.domain, ["negative electrode"])
-        self.assertEqual(c_s_p_surf_disc.domain, ["positive electrode"])
+        assert c_s_n_surf_disc.domain == ["negative electrode"]
+        assert c_s_p_surf_disc.domain == ["positive electrode"]
 
     def test_delta_function(self):
         mesh = get_mesh_for_testing()
@@ -344,17 +400,19 @@ class TestFiniteVolume(TestCase):
         # Basic shape and type tests
         y = np.ones_like(mesh["negative electrode"].nodes[:, np.newaxis])
         # Left
-        self.assertEqual(delta_fn_left_disc.domains, delta_fn_left.domains)
-        self.assertIsInstance(delta_fn_left_disc, pybamm.Multiplication)
-        self.assertIsInstance(delta_fn_left_disc.left, pybamm.Matrix)
-        np.testing.assert_array_equal(delta_fn_left_disc.left.evaluate()[:, 1:], 0)
-        self.assertEqual(delta_fn_left_disc.shape, y.shape)
+        assert delta_fn_left_disc.domains == delta_fn_left.domains
+        assert isinstance(delta_fn_left_disc, pybamm.Multiplication)
+        assert isinstance(delta_fn_left_disc.left, pybamm.Symbol)
+        np.testing.assert_array_almost_equal(
+            delta_fn_left_disc.left.evaluate()[:, 1:], 0
+        )
+        assert delta_fn_left_disc.shape == y.shape
         # Right
-        self.assertEqual(delta_fn_right_disc.domains, delta_fn_right.domains)
-        self.assertIsInstance(delta_fn_right_disc, pybamm.Multiplication)
-        self.assertIsInstance(delta_fn_right_disc.left, pybamm.Matrix)
+        assert delta_fn_right_disc.domains == delta_fn_right.domains
+        assert isinstance(delta_fn_right_disc, pybamm.Multiplication)
+        assert isinstance(delta_fn_right_disc.left, pybamm.Symbol)
         np.testing.assert_array_equal(delta_fn_right_disc.left.evaluate()[:, :-1], 0)
-        self.assertEqual(delta_fn_right_disc.shape, y.shape)
+        assert delta_fn_right_disc.shape == y.shape
 
         # Value tests
         # Delta function should integrate to the same thing as variable
@@ -363,6 +421,46 @@ class TestFiniteVolume(TestCase):
         delta_fn_int_disc = disc.process_symbol(pybamm.Integral(delta_fn_left, x))
         np.testing.assert_allclose(
             var_disc.evaluate(y=y) * mesh["negative electrode"].edges[-1],
+            np.sum(delta_fn_int_disc.evaluate(y=y)),
+        )
+
+    def test_delta_function_symbolic(self):
+        mesh = get_mesh_for_testing_symbolic()
+        spatial_methods = {"domain": pybamm.FiniteVolume()}
+        disc = pybamm.Discretisation(mesh, spatial_methods)
+
+        var = pybamm.Variable("var")
+        delta_fn_left = pybamm.DeltaFunction(var, "left", "domain")
+        delta_fn_right = pybamm.DeltaFunction(var, "right", "domain")
+        disc.set_variable_slices([var])
+        delta_fn_left_disc = disc.process_symbol(delta_fn_left)
+        delta_fn_right_disc = disc.process_symbol(delta_fn_right)
+
+        # Basic shape and type tests
+        y = np.ones_like(mesh["domain"].nodes[:, np.newaxis])
+        # Left
+        assert delta_fn_left_disc.domains == delta_fn_left.domains
+        assert isinstance(delta_fn_left_disc, pybamm.Multiplication)
+        assert isinstance(delta_fn_left_disc.left, pybamm.Symbol)
+        np.testing.assert_array_almost_equal(
+            delta_fn_left_disc.left.evaluate()[:, 1:], 0
+        )
+        assert delta_fn_left_disc.shape == y.shape
+        # Right
+        assert delta_fn_right_disc.domains == delta_fn_right.domains
+        assert isinstance(delta_fn_right_disc, pybamm.Multiplication)
+        assert isinstance(delta_fn_right_disc.left, pybamm.Symbol)
+        np.testing.assert_array_equal(delta_fn_right_disc.left.evaluate()[:, :-1], 0)
+        assert delta_fn_right_disc.shape == y.shape
+
+        # Value tests
+        # Delta function should integrate to the same thing as variable
+        var_disc = disc.process_symbol(var)
+        x = pybamm.SpatialVariable("x", ["domain"])
+        delta_fn_int_disc = disc.process_symbol(pybamm.Integral(delta_fn_left, x))
+        np.testing.assert_allclose(
+            var_disc.evaluate(y=y) * mesh["domain"].edges[-1] * mesh["domain"].length
+            + mesh["domain"].min,
             np.sum(delta_fn_int_disc.evaluate(y=y)),
         )
 
@@ -378,7 +476,7 @@ class TestFiniteVolume(TestCase):
         # process_binary_operators should work with heaviside
         disc_heav = disc.process_symbol(heav * var)
         nodes = mesh["negative electrode"].nodes
-        self.assertEqual(disc_heav.size, nodes.size)
+        assert disc_heav.size == nodes.size
         np.testing.assert_array_equal(disc_heav.evaluate(y=2 * np.ones_like(nodes)), 2)
         np.testing.assert_array_equal(disc_heav.evaluate(y=-2 * np.ones_like(nodes)), 0)
 
@@ -404,8 +502,8 @@ class TestFiniteVolume(TestCase):
 
         nodes = mesh["negative electrode"].nodes
         n = mesh["negative electrode"].npts
-        self.assertEqual(disc_upwind.size, nodes.size + 1)
-        self.assertEqual(disc_downwind.size, nodes.size + 1)
+        assert disc_upwind.size == nodes.size + 1
+        assert disc_downwind.size == nodes.size + 1
 
         y_test = 2 * np.ones_like(nodes)
         np.testing.assert_array_equal(
@@ -420,7 +518,7 @@ class TestFiniteVolume(TestCase):
         # Remove boundary conditions and check error is raised
         disc.bcs = {}
         disc._discretised_symbols = {}
-        with self.assertRaisesRegex(pybamm.ModelError, "Boundary conditions"):
+        with pytest.raises(pybamm.ModelError, match="Boundary conditions"):
             disc.process_symbol(upwind)
 
         # Set wrong boundary conditions and check error is raised
@@ -430,9 +528,9 @@ class TestFiniteVolume(TestCase):
                 "right": (pybamm.Scalar(3), "Neumann"),
             }
         }
-        with self.assertRaisesRegex(pybamm.ModelError, "Dirichlet boundary conditions"):
+        with pytest.raises(pybamm.ModelError, match="Dirichlet boundary conditions"):
             disc.process_symbol(upwind)
-        with self.assertRaisesRegex(pybamm.ModelError, "Dirichlet boundary conditions"):
+        with pytest.raises(pybamm.ModelError, match="Dirichlet boundary conditions"):
             disc.process_symbol(downwind)
 
     def test_grad_div_with_bcs_on_tab(self):
@@ -525,10 +623,10 @@ class TestFiniteVolume(TestCase):
         # check after disc that negative tab goes to left and positive tab goes
         # to right
         disc.process_symbol(grad_eqn)
-        self.assertEqual(disc.bcs[var]["left"][0], pybamm.Scalar(1))
-        self.assertEqual(disc.bcs[var]["left"][1], "Dirichlet")
-        self.assertEqual(disc.bcs[var]["right"][0], pybamm.Scalar(0))
-        self.assertEqual(disc.bcs[var]["right"][1], "Neumann")
+        assert disc.bcs[var]["left"][0] == pybamm.Scalar(1)
+        assert disc.bcs[var]["left"][1] == "Dirichlet"
+        assert disc.bcs[var]["right"][0] == pybamm.Scalar(0)
+        assert disc.bcs[var]["right"][1] == "Neumann"
 
     def test_full_broadcast_domains(self):
         model = pybamm.BaseModel()
@@ -568,12 +666,20 @@ class TestFiniteVolume(TestCase):
         evaluate_at = pybamm.EvaluateAt(var, position)
         evaluate_at_disc = disc.process_symbol(evaluate_at)
 
-        self.assertIsInstance(evaluate_at_disc, pybamm.MatrixMultiplication)
-        self.assertIsInstance(evaluate_at_disc.left, pybamm.Matrix)
-        self.assertIsInstance(evaluate_at_disc.right, pybamm.StateVector)
+        assert isinstance(evaluate_at_disc, pybamm.MatrixMultiplication)
+        assert isinstance(evaluate_at_disc.left, pybamm.Matrix)
+        assert isinstance(evaluate_at_disc.right, pybamm.StateVector)
 
         y = np.arange(n)[:, np.newaxis]
-        self.assertEqual(evaluate_at_disc.evaluate(y=y), y[idx])
+        assert evaluate_at_disc.evaluate(y=y) == y[idx]
+
+        mesh = get_mesh_for_testing_symbolic()
+        spatial_methods = {"domain": pybamm.FiniteVolume()}
+        var = pybamm.Variable("var", domain="domain")
+        disc = pybamm.Discretisation(mesh, spatial_methods)
+        evaluate_at = pybamm.EvaluateAt(var, position)
+        with pytest.raises(pybamm.ModelError):
+            disc.process_symbol(evaluate_at)
 
     def test_inner(self):
         # standard
@@ -598,9 +704,9 @@ class TestFiniteVolume(TestCase):
         disc.bcs = boundary_conditions
         inner_disc = disc.process_symbol(inner)
 
-        self.assertIsInstance(inner_disc, pybamm.Inner)
-        self.assertIsInstance(inner_disc.left, pybamm.MatrixMultiplication)
-        self.assertIsInstance(inner_disc.right, pybamm.MatrixMultiplication)
+        assert isinstance(inner_disc, pybamm.Inner)
+        assert isinstance(inner_disc.left, pybamm.MatrixMultiplication)
+        assert isinstance(inner_disc.right, pybamm.MatrixMultiplication)
 
         n = mesh["negative particle"].npts
         y = np.ones(n)[:, np.newaxis]
@@ -613,19 +719,9 @@ class TestFiniteVolume(TestCase):
 
         inner_disc = disc.process_symbol(inner)
 
-        self.assertIsInstance(inner_disc, pybamm.Inner)
-        self.assertIsInstance(inner_disc.left, pybamm.MatrixMultiplication)
-        self.assertIsInstance(inner_disc.right, pybamm.MatrixMultiplication)
+        assert isinstance(inner_disc, pybamm.Inner)
+        assert isinstance(inner_disc.left, pybamm.MatrixMultiplication)
+        assert isinstance(inner_disc.right, pybamm.MatrixMultiplication)
 
         m = mesh["negative electrode"].npts
         np.testing.assert_array_equal(inner_disc.evaluate(y=y), np.zeros((n * m, 1)))
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()

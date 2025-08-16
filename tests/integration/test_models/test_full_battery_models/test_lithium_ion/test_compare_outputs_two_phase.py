@@ -1,13 +1,12 @@
 #
 # Tests for the surface formulation
 #
-import pybamm
 import numpy as np
-import unittest
-from tests import TestCase
+
+import pybamm
 
 
-class TestCompareOutputsTwoPhase(TestCase):
+class TestCompareOutputsTwoPhase:
     def compare_outputs_two_phase_graphite_graphite(self, model_class):
         """
         Check that a two-phase graphite-graphite model gives the same results as a
@@ -17,7 +16,9 @@ class TestCompareOutputsTwoPhase(TestCase):
         model = model_class()
         parameter_values = pybamm.ParameterValues("Chen2020")
         sim = pybamm.Simulation(model, parameter_values=parameter_values)
-        sol = sim.solve([0, 3600])
+        t_eval = [0, 3600]
+        t_interp = np.linspace(0, 3600)
+        sol = sim.solve(t_eval=t_eval, t_interp=t_interp)
 
         # Two phase model
         model_two_phase = model_class({"particle phases": ("2", "1")})
@@ -65,7 +66,9 @@ class TestCompareOutputsTwoPhase(TestCase):
             model_two_phase, parameter_values=parameter_values_two_phase
         )
         for x in [0.1, 0.3, 0.5]:
-            sol_two_phase = sim.solve([0, 3600], inputs={"ratio": x})
+            sol_two_phase = sim.solve(
+                t_eval=t_eval, t_interp=t_interp, inputs={"ratio": x}
+            )
             # Compare two phase model to standard model
             for variable in [
                 "X-averaged negative electrode active material volume fraction",
@@ -144,9 +147,10 @@ class TestCompareOutputsTwoPhase(TestCase):
         )
 
         sim = pybamm.Simulation(model, parameter_values=param)
-        t_eval = np.linspace(0, 8000, 1000)
+        t_eval = [0, 8000]
+        t_interp = np.linspace(0, 8000, 1000)
         inputs = [{"x": 0.01}, {"x": 0.1}]
-        sol = sim.solve(t_eval, inputs=inputs)
+        sol = sim.solve(t_eval=t_eval, t_interp=t_interp, inputs=inputs)
 
         # Starting values should be close
         for var in [
@@ -159,7 +163,7 @@ class TestCompareOutputsTwoPhase(TestCase):
             )
 
         # More silicon means longer sim
-        self.assertLess(sol[0]["Time [s]"].data[-1], sol[1]["Time [s]"].data[-1])
+        assert sol[0]["Time [s]"].data[-1] < sol[1]["Time [s]"].data[-1]
 
     def test_compare_SPM_silicon_graphite(self):
         model_class = pybamm.lithium_ion.SPM
@@ -172,12 +176,3 @@ class TestCompareOutputsTwoPhase(TestCase):
     def test_compare_DFN_silicon_graphite(self):
         model_class = pybamm.lithium_ion.DFN
         self.compare_outputs_two_phase_silicon_graphite(model_class)
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    unittest.main()

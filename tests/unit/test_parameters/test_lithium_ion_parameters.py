@@ -1,21 +1,18 @@
 #
 # Tests lithium-ion parameters load and give expected values
 #
-import os
-from tests import TestCase
-import pybamm
-from tempfile import TemporaryDirectory
-import unittest
+
 import numpy as np
 
+import pybamm
 
-class TestLithiumIonParameterValues(TestCase):
-    def test_print_parameters(self):
-        with TemporaryDirectory() as dir_name:
-            parameters = pybamm.LithiumIonParameters()
-            parameter_values = pybamm.lithium_ion.BaseModel().default_parameter_values
-            output_file = os.path.join(dir_name, "lithium_ion_parameters.txt")
-            parameter_values.print_parameters(parameters, output_file)
+
+class TestLithiumIonParameterValues:
+    def test_print_parameters(self, tmp_path):
+        parameters = pybamm.LithiumIonParameters()
+        parameter_values = pybamm.lithium_ion.BaseModel().default_parameter_values
+        output_file = tmp_path / "lithium_ion_parameters.txt"
+        parameter_values.print_parameters(parameters, output_file)
 
     def test_lithium_ion(self):
         """This test checks that all the parameters are being calculated
@@ -109,6 +106,20 @@ class TestLithiumIonParameterValues(TestCase):
 
     def test_thermal_parameters(self):
         values = pybamm.lithium_ion.BaseModel().default_parameter_values
+        values.update(
+            {
+                "Cell heat capacity [J.K-1.m-3]": 2.5e6,
+                "Left face heat transfer coefficient [W.m-2.K-1]": 5.0,
+                "Right face heat transfer coefficient [W.m-2.K-1]": 5.0,
+                "Front face heat transfer coefficient [W.m-2.K-1]": 5.0,
+                "Back face heat transfer coefficient [W.m-2.K-1]": 5.0,
+                "Bottom face heat transfer coefficient [W.m-2.K-1]": 5.0,
+                "Top face heat transfer coefficient [W.m-2.K-1]": 5.0,
+                "Inner radius heat transfer coefficient [W.m-2.K-1]": 5.0,
+                "Outer radius heat transfer coefficient [W.m-2.K-1]": 5.0,
+            },
+            check_already_exists=False,
+        )
         param = pybamm.LithiumIonParameters()
         T = param.T_ref
 
@@ -128,6 +139,15 @@ class TestLithiumIonParameterValues(TestCase):
 
         # other thermal parameters
         np.testing.assert_equal(values.evaluate(param.T_init), 298.15)
+        np.testing.assert_equal(values.evaluate(param.cell_heat_capacity), 2.5e6)
+        np.testing.assert_equal(values.evaluate(param.h_edge_x_min), 5.0)
+        np.testing.assert_equal(values.evaluate(param.h_edge_x_max), 5.0)
+        np.testing.assert_equal(values.evaluate(param.h_edge_y_min), 5.0)
+        np.testing.assert_equal(values.evaluate(param.h_edge_y_max), 5.0)
+        np.testing.assert_equal(values.evaluate(param.h_edge_z_min), 5.0)
+        np.testing.assert_equal(values.evaluate(param.h_edge_z_max), 5.0)
+        np.testing.assert_equal(values.evaluate(param.h_edge_radial_min), 5.0)
+        np.testing.assert_equal(values.evaluate(param.h_edge_radial_max), 5.0)
 
     def test_parameter_functions(self):
         values = pybamm.lithium_ion.BaseModel().default_parameter_values
@@ -138,13 +158,3 @@ class TestLithiumIonParameterValues(TestCase):
         c_e_test = 1000
         values.evaluate(param.D_e(c_e_test, T_test))
         values.evaluate(param.kappa_e(c_e_test, T_test))
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()

@@ -1,6 +1,8 @@
 #
 # Base unit tests for the lithium-ion models
 #
+import pytest
+
 import pybamm
 
 
@@ -31,6 +33,10 @@ class BaseUnitTestLithiumIon:
         options = {"thermal": "lumped"}
         self.check_well_posedness(options)
 
+    def test_well_posed_lumped_thermal_model_surface_temperature(self):
+        options = {"thermal": "lumped", "surface temperature": "lumped"}
+        self.check_well_posedness(options)
+
     def test_well_posed_x_full_thermal_model(self):
         options = {"thermal": "x-full"}
         self.check_well_posedness(options)
@@ -50,6 +56,18 @@ class BaseUnitTestLithiumIon:
             "thermal": "lumped",
         }
         self.check_well_posedness(options)
+
+    def test_well_posed_lumped_thermal_capacity_model(self):
+        options = {"thermal": "lumped", "use lumped thermal capacity": "true"}
+        self.check_well_posedness(options)
+
+    def test_incompatible_lumped_thermal_capacity_option(self):
+        options = {"thermal": "x-full", "use lumped thermal capacity": "true"}
+        with pytest.raises(
+            pybamm.OptionError,
+            match="Lumped thermal capacity model only compatible with lumped thermal models",
+        ):
+            self.check_well_posedness(options)
 
     def test_well_posed_thermal_1plus1D(self):
         options = {
@@ -138,7 +156,10 @@ class BaseUnitTestLithiumIon:
         self.check_well_posedness(options)
 
     def test_well_posed_contact_resistance(self):
-        options = {"contact resistance": "true"}
+        options = {
+            "contact resistance": "true",
+            "thermal": "lumped",
+        }
         self.check_well_posedness(options)
 
     def test_well_posed_particle_uniform(self):
@@ -270,6 +291,18 @@ class BaseUnitTestLithiumIon:
         options = {
             "SEI": "ec reaction limited (asymmetric)",
             "SEI porosity change": "true",
+        }
+        self.check_well_posedness(options)
+
+    def test_well_posed_sei_VonKolzenberg2020_model(self):
+        options = {
+            "SEI": "VonKolzenberg2020",
+        }
+        self.check_well_posedness(options)
+
+    def test_well_posed_sei_tunnelling_limited(self):
+        options = {
+            "SEI": "tunnelling limited",
         }
         self.check_well_posedness(options)
 
@@ -480,8 +513,14 @@ class BaseUnitTestLithiumIon:
         options = {"open-circuit potential": "current sigmoid"}
         self.check_well_posedness(options)
 
-    def test_well_posed_wycisk_ocp(self):
-        options = {"open-circuit potential": "Wycisk"}
+    def test_well_posed_one_state_differential_capacity_hysteresis_ocp(self):
+        options = {
+            "open-circuit potential": "one-state differential capacity hysteresis"
+        }
+        self.check_well_posedness(options)
+
+    def test_well_posed_one_state_hysteresis_ocp(self):
+        options = {"open-circuit potential": "one-state hysteresis"}
         self.check_well_posedness(options)
 
     def test_well_posed_msmr(self):
@@ -504,6 +543,22 @@ class BaseUnitTestLithiumIon:
 
     def test_well_posed_psd(self):
         options = {"particle size": "distribution", "surface form": "algebraic"}
+        self.check_well_posedness(options)
+
+    def test_well_posed_psd_swelling_and_cracking(self):
+        options = {
+            "particle size": "distribution",
+            "particle mechanics": "swelling and cracking",
+            "surface form": "algebraic",
+        }
+        self.check_well_posedness(options)
+
+    def test_well_posed_psd_swelling_only(self):
+        options = {
+            "particle size": "distribution",
+            "particle mechanics": "swelling only",
+            "surface form": "algebraic",
+        }
         self.check_well_posedness(options)
 
     def test_well_posed_transport_efficiency_Bruggeman(self):
@@ -554,5 +609,49 @@ class BaseUnitTestLithiumIon:
             "particle phases": ("2", "1"),
             "diffusivity": (("current sigmoid", "current sigmoid"), "current sigmoid"),
             "open-circuit potential": (("current sigmoid", "single"), "single"),
+        }
+        self.check_well_posedness(options)
+
+    def test_well_posed_composite_different_degradation(self):
+        # phases have same degradation
+        options = {
+            "particle phases": ("2", "1"),
+            "SEI": ("ec reaction limited", "none"),
+            "SEI porosity change": "true",
+            "lithium plating": ("reversible", "none"),
+            "open-circuit potential": (("current sigmoid", "single"), "single"),
+        }
+        self.check_well_posedness(options)
+        # phases have different degradation
+        options = {
+            "particle phases": ("2", "1"),
+            "SEI": (("ec reaction limited", "solvent-diffusion limited"), "none"),
+            "SEI porosity change": "true",
+            "lithium plating": (("reversible", "irreversible"), "none"),
+            "open-circuit potential": (("current sigmoid", "single"), "single"),
+        }
+        self.check_well_posedness(options)
+        # one of the phases has no degradation
+        options = {
+            "particle phases": ("2", "1"),
+            "SEI": (("none", "solvent-diffusion limited"), "none"),
+            "lithium plating": (("none", "irreversible"), "none"),
+        }
+        self.check_well_posedness(options)
+
+    def test_well_posed_composite_LAM(self):
+        # phases with LAM degradation
+        options = {
+            "particle phases": ("2", "1"),
+            "open-circuit potential": (("single", "current sigmoid"), "single"),
+            "SEI": "solvent-diffusion limited",
+            "loss of active material": "reaction-driven",
+        }
+        self.check_well_posedness(options)
+
+        options = {
+            "particle phases": ("2", "1"),
+            "open-circuit potential": (("single", "current sigmoid"), "single"),
+            "loss of active material": "stress-driven",
         }
         self.check_well_posedness(options)

@@ -1,32 +1,30 @@
 import importlib
-from tests import TestCase
 import os
 import sys
-import pybamm
-import tempfile
-import unittest
-from unittest.mock import patch
 from io import StringIO
 
+import pytest
+
+import pybamm
 from tests import (
     get_optional_distribution_deps,
-    get_required_distribution_deps,
     get_present_optional_import_deps,
+    get_required_distribution_deps,
 )
 
 
-class TestUtil(TestCase):
+class TestUtil:
     """
     Test the functionality in util.py
     """
 
     def test_is_constant_and_can_evaluate(self):
         symbol = pybamm.PrimaryBroadcast(0, "negative electrode")
-        self.assertEqual(False, pybamm.is_constant_and_can_evaluate(symbol))
+        assert not pybamm.is_constant_and_can_evaluate(symbol)
         symbol = pybamm.StateVector(slice(0, 1))
-        self.assertEqual(False, pybamm.is_constant_and_can_evaluate(symbol))
+        assert not pybamm.is_constant_and_can_evaluate(symbol)
         symbol = pybamm.Scalar(0)
-        self.assertEqual(True, pybamm.is_constant_and_can_evaluate(symbol))
+        assert pybamm.is_constant_and_can_evaluate(symbol)
 
     def test_fuzzy_dict(self):
         d = pybamm.FuzzyDict(
@@ -36,56 +34,61 @@ class TestUtil(TestCase):
                 "SEI current": 3,
                 "Lithium plating current": 4,
                 "A dimensional variable [m]": 5,
+                "Positive particle diffusivity [m2.s-1]": 6,
+                "Primary: Open circuit voltage [V]": 7,
+            }
+        )
+        d2 = pybamm.FuzzyDict(
+            {
                 "Positive electrode diffusivity [m2.s-1]": 6,
             }
         )
-        self.assertEqual(d["test"], 1)
-        with self.assertRaisesRegex(KeyError, "'test3' not found. Best matches are "):
+        assert d["test"] == 1
+        with pytest.raises(KeyError, match="'test3' not found. Best matches are "):
             d.__getitem__("test3")
 
-        with self.assertRaisesRegex(KeyError, "stoichiometry"):
+        with pytest.raises(KeyError, match="stoichiometry"):
             d.__getitem__("Negative electrode SOC")
 
-        with self.assertRaisesRegex(KeyError, "dimensional version"):
+        with pytest.raises(KeyError, match="dimensional version"):
             d.__getitem__("A dimensional variable")
 
-        with self.assertRaisesRegex(KeyError, "open circuit voltage"):
+        with pytest.raises(KeyError, match="composite model"):
+            d.__getitem__("Open circuit voltage [V]")
+
+        with pytest.raises(KeyError, match="open circuit voltage"):
             d.__getitem__("Measured open circuit voltage [V]")
 
-        with self.assertRaisesRegex(KeyError, "Lower voltage"):
+        with pytest.raises(KeyError, match="Lower voltage"):
             d.__getitem__("Open-circuit voltage at 0% SOC [V]")
 
-        with self.assertRaisesRegex(KeyError, "Upper voltage"):
+        with pytest.raises(KeyError, match="Upper voltage"):
             d.__getitem__("Open-circuit voltage at 100% SOC [V]")
 
-        with self.assertWarns(DeprecationWarning):
-            self.assertEqual(
-                d["Positive electrode diffusivity [m2.s-1]"],
-                d["Positive particle diffusivity [m2.s-1]"],
+        assert (
+            d2["Positive particle diffusivity [m2.s-1]"]
+            == d["Positive particle diffusivity [m2.s-1]"]
+        )
+
+        assert (
+            d2["Positive electrode diffusivity [m2.s-1]"]
+            == d["Positive electrode diffusivity [m2.s-1]"]
+        )
+
+        with pytest.warns(DeprecationWarning):
+            assert (
+                d["Positive electrode diffusivity [m2.s-1]"]
+                == d["Positive particle diffusivity [m2.s-1]"]
             )
 
-    def test_get_parameters_filepath(self):
-        tempfile_obj = tempfile.NamedTemporaryFile("w", dir=".")
-        self.assertTrue(
-            pybamm.get_parameters_filepath(tempfile_obj.name) == tempfile_obj.name
+    def test_get_parameters_filepath(self, tmp_path):
+        temppath = tmp_path / "temp_file.txt"
+        assert pybamm.get_parameters_filepath(temppath) == str(temppath)
+
+        temppath = "random.txt"
+        assert pybamm.get_parameters_filepath(temppath) == str(
+            os.path.join(pybamm.root_dir(), "src", "pybamm", temppath)
         )
-        tempfile_obj.close()
-
-        package_dir = os.path.join(pybamm.root_dir(), "pybamm")
-        tempfile_obj = tempfile.NamedTemporaryFile("w", dir=package_dir)
-        path = os.path.join(package_dir, tempfile_obj.name)
-        self.assertTrue(pybamm.get_parameters_filepath(tempfile_obj.name) == path)
-        tempfile_obj.close()
-
-    def test_is_jax_compatible(self):
-        if pybamm.have_jax():
-            compatible = pybamm.is_jax_compatible()
-            self.assertTrue(compatible)
-
-    def test_git_commit_info(self):
-        git_commit_info = pybamm.get_git_commit_info()
-        self.assertIsInstance(git_commit_info, str)
-        self.assertEqual(git_commit_info[:2], "v2")
 
     def test_import_optional_dependency(self):
         optional_distribution_deps = get_optional_distribution_deps("pybamm")
@@ -101,9 +104,9 @@ class TestUtil(TestCase):
 
         # Test import optional dependency
         for import_pkg in present_optional_import_deps:
-            with self.assertRaisesRegex(
+            with pytest.raises(
                 ModuleNotFoundError,
-                f"Optional dependency {import_pkg} is not available.",
+                match=f"Optional dependency {import_pkg} is not available.",
             ):
                 pybamm.util.import_optional_dependency(import_pkg)
 
@@ -135,7 +138,7 @@ class TestUtil(TestCase):
         try:
             importlib.import_module("pybamm")
         except ModuleNotFoundError as error:
-            self.fail(
+            pytest.fail(
                 f"Import of 'pybamm' shouldn't require optional dependencies. Error: {error}"
             )
         finally:
@@ -154,47 +157,123 @@ class TestUtil(TestCase):
             )
 
         # Check that optional dependencies are not present in the core PyBaMM installation
-        optional_present_deps = optional_distribution_deps & required_distribution_deps
-        self.assertFalse(
-            bool(optional_present_deps),
+        optional_present_deps = bool(
+            optional_distribution_deps & required_distribution_deps
+        )
+        assert not optional_present_deps, (
             f"Optional dependencies installed: {optional_present_deps}.\n"
             "Please ensure that optional dependencies are not present in the core PyBaMM installation, "
-            "or list them as required.",
+            "or list them as required."
         )
 
 
-class TestSearch(TestCase):
-    def test_url_gets_to_stdout(self):
+class TestSearch:
+    def test_url_gets_to_stdout(self, mocker):
         model = pybamm.BaseModel()
         model.variables = {"Electrolyte concentration": 1, "Electrode potential": 0}
 
         param = pybamm.ParameterValues({"test": 10, "b": 2})
 
         # Test variables search (default returns key)
-        with patch("sys.stdout", new=StringIO()) as fake_out:
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
             model.variables.search("Electrode")
-            self.assertEqual(fake_out.getvalue(), "Electrode potential\n")
-
+            assert (
+                fake_out.getvalue()
+                == "Results for 'Electrode': ['Electrode potential']\n"
+            )
         # Test bad var search (returns best matches)
-        with patch("sys.stdout", new=StringIO()) as fake_out:
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
             model.variables.search("Electrolyte cot")
             out = (
-                "No results for search using 'Electrolyte cot'. "
-                "Best matches are ['Electrolyte concentration', "
-                "'Electrode potential']\n"
+                "No exact matches found for 'Electrolyte cot'. "
+                "Best matches are: ['Electrolyte concentration', 'Electrode potential']\n"
             )
-            self.assertEqual(fake_out.getvalue(), out)
+            assert fake_out.getvalue() == out
+
+        # Test for multiple strings as input (default returns key)
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
+            model.variables.search(["Electrolyte", "Concentration"], print_values=True)
+            assert (
+                fake_out.getvalue()
+                == "Results for 'Electrolyte Concentration': ['Electrolyte concentration']\n"
+                "Electrolyte concentration -> 1\n"
+            )
+
+        # Test for multiple strings as input (default returns best matches)
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
+            model.variables.search(["Electrolyte", "Potenteel"], print_values=True)
+            out = (
+                "Exact matches for 'Electrolyte': ['Electrolyte concentration']\n"
+                "Electrolyte concentration -> 1\n"
+                "No exact matches found for 'Potenteel'. Best matches are: ['Electrode potential']\n"
+            )
+            assert fake_out.getvalue() == out
 
         # Test param search (default returns key, value)
-        with patch("sys.stdout", new=StringIO()) as fake_out:
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
             param.search("test")
-            self.assertEqual(fake_out.getvalue(), "test\t10\n")
+            out = "Results for 'test': ['test']\ntest -> 10\n"
+            assert fake_out.getvalue() == out
 
+        # Test no matches and no best matches
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
+            model.variables.search("NonexistentKey")
+            assert fake_out.getvalue() == "No matches found for 'NonexistentKey'\n"
 
-if __name__ == "__main__":
-    print("Add -v for more debug output")
+        # Test print_values=True with partial matches
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
+            model.variables.search("Electrolyte", print_values=True)
+            out = (
+                "Results for 'Electrolyte': ['Electrolyte concentration']\n"
+                "Electrolyte concentration -> 1\n"
+            )
+            assert fake_out.getvalue() == out
 
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()
+        # Test for empty string input (raises ValueError)
+        with pytest.raises(
+            ValueError,
+            match="The search term cannot be an empty or whitespace-only string",
+        ):
+            model.variables.search("", print_values=True)
+
+        # Test for list with all empty strings (raises ValueError)
+        with pytest.raises(
+            ValueError,
+            match="The 'keys' list cannot contain only empty or whitespace strings",
+        ):
+            model.variables.search(["", "   ", "\t"], print_values=True)
+
+        # Test for list with a mix of empty and valid strings
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
+            model.variables.search(["", "Electrolyte"], print_values=True)
+            out = (
+                "Results for 'Electrolyte': ['Electrolyte concentration']\n"
+                "Electrolyte concentration -> 1\n"
+            )
+            assert fake_out.getvalue() == out
+
+        # Test invalid input type
+        with pytest.raises(
+            TypeError,
+            match="'keys' must be a string or a list of strings, got <class 'int'>",
+        ):
+            model.variables.search(123)
+
+        # Test smaller strings
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
+            model.variables.search(["El", "co"], print_values=True)
+            out = "No matches found for 'El'\nNo matches found for 'co'\n"
+            assert fake_out.getvalue() == out
+
+        # Case where min_similarity is high (0.9)
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
+            model.variables.search("electro", min_similarity=0.9)
+            assert fake_out.getvalue() == "No matches found for 'electro'\n"
+
+        # Case where min_similarity is low (0.3)
+        with mocker.patch("sys.stdout", new=StringIO()) as fake_out:
+            model.variables.search("electro", min_similarity=0.3)
+            assert (
+                fake_out.getvalue()
+                == "Results for 'electro': ['Electrolyte concentration', 'Electrode potential']\n"
+            )

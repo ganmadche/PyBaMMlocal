@@ -12,10 +12,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5334/jors.309.svg)](https://doi.org/10.5334/jors.309)
 [![release](https://img.shields.io/github/v/release/pybamm-team/PyBaMM?color=yellow)](https://github.com/pybamm-team/PyBaMM/releases)
 [![code style](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-87-orange.svg)](#-contributors)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/pybamm-team/PyBaMM/badge)](https://scorecard.dev/viewer/?uri=github.com/pybamm-team/PyBaMM)
 
 </div>
 
@@ -32,7 +29,7 @@ of differential equations,
 Together, these enable flexible model definitions and fast battery simulations, allowing users to
 explore the effect of different battery designs and modeling assumptions under a variety of operating scenarios.
 
-[//]: # "numfocus-fiscal-sponsor-attribution"
+[//]: # (numfocus-fiscal-sponsor-attribution)
 
 PyBaMM uses an [open governance model](https://pybamm.org/governance/)
 and is fiscally sponsored by [NumFOCUS](https://numfocus.org/). Consider making
@@ -52,7 +49,7 @@ pay for developer time, professional services, travel, workshops, and a variety 
 
 The easiest way to use PyBaMM is to run a 1C constant-current discharge with a model of your choice with all the default settings:
 
-```python3
+```python
 import pybamm
 
 model = pybamm.lithium_ion.DFN()  # Doyle-Fuller-Newman model
@@ -63,7 +60,7 @@ sim.plot()
 
 or simulate an experiment such as a constant-current discharge followed by a constant-current-constant-voltage charge:
 
-```python3
+```python
 import pybamm
 
 experiment = pybamm.Experiment(
@@ -79,7 +76,7 @@ experiment = pybamm.Experiment(
     * 3,
 )
 model = pybamm.lithium_ion.DFN()
-sim = pybamm.Simulation(model, experiment=experiment, solver=pybamm.CasadiSolver())
+sim = pybamm.Simulation(model, experiment=experiment)
 sim.solve()
 sim.plot()
 ```
@@ -156,11 +153,11 @@ You can use the BibTeX
 
 We would be grateful if you could also cite the relevant papers. These will change depending on what models and solvers you use. To find out which papers you should cite, add the line
 
-```python3
+```python
 pybamm.print_citations()
 ```
 
-to the end of your script. This will print BibTeX information to the terminal; passing a filename to `print_citations` will print the BibTeX information to the specified file instead. A list of all citations can also be found in the [citations file](https://github.com/pybamm-team/PyBaMM/blob/develop/pybamm/CITATIONS.bib). In particular, PyBaMM relies heavily on [CasADi](https://web.casadi.org/publications/).
+to the end of your script. This will print BibTeX information to the terminal; passing a filename to `print_citations` will print the BibTeX information to the specified file instead. A list of all citations can also be found in the [citations file](https://github.com/pybamm-team/PyBaMM/blob/develop/src/pybamm/CITATIONS.bib). In particular, PyBaMM relies heavily on [CasADi](https://web.casadi.org/publications/).
 See [CONTRIBUTING.md](https://github.com/pybamm-team/PyBaMM/blob/develop/CONTRIBUTING.md#citations) for information on how to add your own citations when you contribute.
 
 ## 🛠️ Contributing to PyBaMM
@@ -169,15 +166,11 @@ If you'd like to help us develop PyBaMM by adding new methods, writing documenta
 
 ## 📫 Get in touch
 
-For any questions, comments, suggestions or bug reports, please see the
-[contact page](https://www.pybamm.org/community).
+For any questions, comments, suggestions or bug reports, please visit:
+
+- Our [Contact Page](https://www.pybamm.org/community)
+- Our [Discussion Forum](https://pybamm.discourse.group/)
 
 ## 📃 License
 
 PyBaMM is fully open source. For more information about its license, see [LICENSE](https://github.com/pybamm-team/PyBaMM/blob/develop/LICENSE.txt).
-
-## ✨ Contributors
-
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind are welcome!
-
-Click here to see [a full list](https://github.com/pybamm-team/PyBaMM/blob/develop/all_contributors.md) of our contributors' profiles.

@@ -1,6 +1,7 @@
-import pybamm
-import pandas as pd
 import numpy as np
+import pandas as pd
+
+import pybamm
 
 
 def process_2D(name, data):
@@ -19,7 +20,7 @@ def process_2D(name, data):
     return formatted_data
 
 
-parameter_values = pybamm.ParameterValues(pybamm.parameter_sets.Chen2020)
+parameter_values = pybamm.ParameterValues("Chen2020")
 
 # overwrite the diffusion coefficient with a 2D lookup table
 D_s_n = parameter_values["Negative particle diffusivity [m2.s-1]"]

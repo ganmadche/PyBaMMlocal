@@ -22,6 +22,7 @@ maxdepth: 2
 ---
 fundamentals/index
 fundamentals/battery_models
+fundamentals/public_api
 ```
 
 ```{toctree}
@@ -72,3 +73,27 @@ glob:
 ../examples/notebooks/creating_models/5-half-cell-model.ipynb
 ../examples/notebooks/creating_models/6-a-simple-SEI-model.ipynb
 ```
+
+```{nbgallery}
+---
+caption: Performance
+maxdepth: 1
+glob:
+---
+../examples/notebooks/performance/01-simulation-pipeline.ipynb
+../examples/notebooks/performance/02-input-parameters.ipynb
+../examples/notebooks/performance/03-pybamm-solvers.ipynb
+../examples/notebooks/performance/04-interpolation-points.ipynb
+../examples/notebooks/performance/05-solver-tolerances.ipynb
+../examples/notebooks/performance/06-output-variables.ipynb
+../examples/notebooks/performance/07-multithreading.ipynb
+```
+
+# Telemetry
+
+PyBaMM optionally collects anonymous usage data to help improve the library. This telemetry is opt-in and can be easily disabled. Here's what you need to know:
+
+- **What is collected**: Basic usage information like PyBaMM version, Python version, and which functions are run.
+- **Why**: To understand how PyBaMM is used and prioritize development efforts.
+- **Opt-out**: To disable telemetry, set the environment variable `PYBAMM_DISABLE_TELEMETRY=true` (or any value other than `false`) or use `pybamm.telemetry.disable()` in your code.
+- **Privacy**: No personal information (name, email, etc) or sensitive information (parameter values, simulation results, etc) is ever collected.

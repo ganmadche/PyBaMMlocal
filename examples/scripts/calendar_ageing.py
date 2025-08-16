@@ -1,5 +1,6 @@
-import pybamm as pb
 import numpy as np
+
+import pybamm as pb
 
 pb.set_logging_level("INFO")
 
@@ -25,7 +26,7 @@ for model in models:
 
     sim = pb.Simulation(model, parameter_values=parameter_values)
 
-    solver = pb.CasadiSolver(mode="fast")
+    solver = pb.IDAKLUSolver()
 
     years = 30
     days = years * 365

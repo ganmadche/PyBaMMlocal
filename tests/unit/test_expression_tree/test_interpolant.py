@@ -1,45 +1,44 @@
 #
 # Tests for the Function classes
 #
-from tests import TestCase
+
+import numpy as np
+import pytest
+
 import pybamm
 
-import unittest
-import unittest.mock as mock
-import numpy as np
 
-
-class TestInterpolant(TestCase):
+class TestInterpolant:
     def test_errors(self):
-        with self.assertRaisesRegex(ValueError, "x1"):
+        with pytest.raises(ValueError, match="x1"):
             pybamm.Interpolant(np.ones(10), np.ones(11), pybamm.Symbol("a"))
-        with self.assertRaisesRegex(ValueError, "x2"):
+        with pytest.raises(ValueError, match="x2"):
             pybamm.Interpolant(
                 (np.ones(10), np.ones(11)), np.ones((10, 12)), pybamm.Symbol("a")
             )
-        with self.assertRaisesRegex(ValueError, "x1"):
+        with pytest.raises(ValueError, match="x1"):
             pybamm.Interpolant(
                 (np.ones(11), np.ones(12)), np.ones((10, 12)), pybamm.Symbol("a")
             )
-        with self.assertRaisesRegex(ValueError, "y should"):
+        with pytest.raises(ValueError, match="y should"):
             pybamm.Interpolant(
                 (np.ones(10), np.ones(11)), np.ones(10), pybamm.Symbol("a")
             )
-        with self.assertRaisesRegex(ValueError, "interpolator 'bla' not recognised"):
+        with pytest.raises(ValueError, match="interpolator 'bla' not recognised"):
             pybamm.Interpolant(
                 np.ones(10), np.ones(10), pybamm.Symbol("a"), interpolator="bla"
             )
-        with self.assertRaisesRegex(ValueError, "child should have size 1"):
+        with pytest.raises(ValueError, match="child should have size 1"):
             pybamm.Interpolant(
                 np.ones(10), np.ones((10, 11)), pybamm.StateVector(slice(0, 2))
             )
-        with self.assertRaisesRegex(ValueError, "should equal"):
+        with pytest.raises(ValueError, match="should equal"):
             pybamm.Interpolant(
                 (np.ones(12), np.ones(10)), np.ones((10, 12)), pybamm.Symbol("a")
             )
 
-        with self.assertRaisesRegex(
-            ValueError, "len\\(x\\) should equal len\\(children\\)"
+        with pytest.raises(
+            ValueError, match="len\\(x\\) should equal len\\(children\\)"
         ):
             pybamm.Interpolant(
                 (np.ones(10), np.ones(12)), np.ones((10, 12)), pybamm.Symbol("a")
@@ -51,15 +50,21 @@ class TestInterpolant(TestCase):
         # linear
         for interpolator in ["linear", "cubic", "pchip"]:
             interp = pybamm.Interpolant(x, 2 * x, y, interpolator=interpolator)
-            np.testing.assert_array_almost_equal(
-                interp.evaluate(y=np.array([0.397, 1.5]))[:, 0], np.array([0.794, 3])
+            np.testing.assert_allclose(
+                interp.evaluate(y=np.array([0.397, 1.5]))[:, 0],
+                np.array([0.794, 3]),
+                rtol=1e-7,
+                atol=1e-6,
             )
         # square
         y = pybamm.StateVector(slice(0, 1))
         for interpolator in ["linear", "cubic", "pchip"]:
             interp = pybamm.Interpolant(x, x**2, y, interpolator=interpolator)
-            np.testing.assert_array_almost_equal(
-                interp.evaluate(y=np.array([0.397]))[:, 0], np.array([0.397**2])
+            np.testing.assert_allclose(
+                interp.evaluate(y=np.array([0.397]))[:, 0],
+                np.array([0.397**2]),
+                rtol=1e-7,
+                atol=1e-6,
             )
 
         # with extrapolation set to False
@@ -71,10 +76,15 @@ class TestInterpolant(TestCase):
                 interp.evaluate(y=np.array([2]))[:, 0], np.array([np.nan])
             )
 
+    def test_interpolation_non_increasing(self):
+        x = np.flip(np.linspace(0, 1, 200))
+        with pytest.raises(ValueError, match="x should be monotonically increasing"):
+            pybamm.Interpolant(x, 2 * x, 0.5)
+
     def test_interpolation_float(self):
         x = np.linspace(0, 1, 200)
         interp = pybamm.Interpolant(x, 2 * x, 0.5)
-        self.assertEqual(interp.evaluate(), 1)
+        assert interp.evaluate() == 1
 
     def test_interpolation_1_x_2d_y(self):
         x = np.linspace(0, 1, 200)
@@ -83,8 +93,11 @@ class TestInterpolant(TestCase):
         # linear
         for interpolator in ["linear", "cubic", "pchip"]:
             interp = pybamm.Interpolant(x, y, var, interpolator=interpolator)
-            np.testing.assert_array_almost_equal(
-                interp.evaluate(y=np.array([0.397])), 0.794 * np.ones((10, 1))
+            np.testing.assert_allclose(
+                interp.evaluate(y=np.array([0.397])),
+                0.794 * np.ones((10, 1)),
+                rtol=1e-7,
+                atol=1e-6,
             )
 
     def test_interpolation_2_x_2d_y(self):
@@ -95,13 +108,13 @@ class TestInterpolant(TestCase):
         var2 = pybamm.StateVector(slice(1, 2))
         # linear
         interp = pybamm.Interpolant(x, z, (var1, var2), interpolator="linear")
-        np.testing.assert_array_almost_equal(
-            interp.evaluate(y=np.array([0, 0])), 0, decimal=3
+        np.testing.assert_allclose(
+            interp.evaluate(y=np.array([0, 0])), 0, rtol=1e-4, atol=1e-3
         )
         # cubic
         interp = pybamm.Interpolant(x, z, (var1, var2), interpolator="cubic")
-        np.testing.assert_array_almost_equal(
-            interp.evaluate(y=np.array([0, 0])), 0, decimal=3
+        np.testing.assert_allclose(
+            interp.evaluate(y=np.array([0, 0])), 0, rtol=1e-4, atol=1e-3
         )
 
     def test_interpolation_2_x(self):
@@ -137,25 +150,25 @@ class TestInterpolant(TestCase):
 
         # Test raising error if data is not 2D
         data_3d = np.zeros((11, 22, 33))
-        with self.assertRaisesRegex(ValueError, "y should be two-dimensional"):
+        with pytest.raises(ValueError, match="y should be two-dimensional"):
             interp = pybamm.Interpolant(
                 x_in, data_3d, (var1, var2), interpolator="linear"
             )
 
         # Test raising error if wrong shapes
-        with self.assertRaisesRegex(ValueError, "x1.shape"):
+        with pytest.raises(ValueError, match="x1.shape"):
             interp = pybamm.Interpolant(
                 x_in, np.zeros((12, 22)), (var1, var2), interpolator="linear"
             )
 
-        with self.assertRaisesRegex(ValueError, "x2.shape"):
+        with pytest.raises(ValueError, match="x2.shape"):
             interp = pybamm.Interpolant(
                 x_in, np.zeros((11, 23)), (var1, var2), interpolator="linear"
             )
 
         # Raise error if not linear
-        with self.assertRaisesRegex(
-            ValueError, "interpolator should be 'linear' or 'cubic'"
+        with pytest.raises(
+            ValueError, match="interpolator should be 'linear' or 'cubic'"
         ):
             interp = pybamm.Interpolant(x_in, data, (var1, var2), interpolator="pchip")
 
@@ -180,7 +193,7 @@ class TestInterpolant(TestCase):
         value = interp._function_evaluate(evaluated_children)
 
         # Test evaluation fails with different child shapes
-        with self.assertRaisesRegex(ValueError, "All children must"):
+        with pytest.raises(ValueError, match="All children must"):
             evaluated_children = [np.array([[1, 1]]), np.array([7])]
             value = interp._function_evaluate(evaluated_children)
 
@@ -193,11 +206,11 @@ class TestInterpolant(TestCase):
 
         evaluated_children = [np.array([[1, 1]]), np.array([[7, 7]])]
         value = interp._function_evaluate(evaluated_children)
-        self.assertEqual(value.shape, evaluated_children[0].shape)
+        assert value.shape == evaluated_children[0].shape
 
         evaluated_children = [np.array([[1, 1], [1, 1]]), np.array([[7, 7], [7, 7]])]
         value = interp._function_evaluate(evaluated_children)
-        self.assertEqual(value.shape, evaluated_children[0].shape)
+        assert value.shape == evaluated_children[0].shape
 
     def test_interpolation_3_x(self):
         def f(x, y, z):
@@ -235,30 +248,30 @@ class TestInterpolant(TestCase):
 
         # Test raising error if data is not 3D
         data_4d = np.zeros((11, 22, 33, 5))
-        with self.assertRaisesRegex(ValueError, "y should be three-dimensional"):
+        with pytest.raises(ValueError, match="y should be three-dimensional"):
             interp = pybamm.Interpolant(
                 x_in, data_4d, (var1, var2, var3), interpolator="linear"
             )
 
         # Test raising error if wrong shapes
-        with self.assertRaisesRegex(ValueError, "x1.shape"):
+        with pytest.raises(ValueError, match="x1.shape"):
             interp = pybamm.Interpolant(
                 x_in, np.zeros((12, 22, 33)), (var1, var2, var3), interpolator="linear"
             )
 
-        with self.assertRaisesRegex(ValueError, "x2.shape"):
+        with pytest.raises(ValueError, match="x2.shape"):
             interp = pybamm.Interpolant(
                 x_in, np.zeros((11, 23, 33)), (var1, var2, var3), interpolator="linear"
             )
 
-        with self.assertRaisesRegex(ValueError, "x3.shape"):
+        with pytest.raises(ValueError, match="x3.shape"):
             interp = pybamm.Interpolant(
                 x_in, np.zeros((11, 22, 34)), (var1, var2, var3), interpolator="linear"
             )
 
         # Raise error if not linear
-        with self.assertRaisesRegex(
-            ValueError, "interpolator should be 'linear' or 'cubic'"
+        with pytest.raises(
+            ValueError, match="interpolator should be 'linear' or 'cubic'"
         ):
             interp = pybamm.Interpolant(
                 x_in, data, (var1, var2, var3), interpolator="pchip"
@@ -287,7 +300,7 @@ class TestInterpolant(TestCase):
         value = interp._function_evaluate(evaluated_children)
 
         # Test evaluation fails with different child shapes
-        with self.assertRaisesRegex(ValueError, "All children must"):
+        with pytest.raises(ValueError, match="All children must"):
             evaluated_children = [np.array([[1, 1]]), np.ones(()) * 4, np.array([[7]])]
             value = interp._function_evaluate(evaluated_children)
 
@@ -299,9 +312,9 @@ class TestInterpolant(TestCase):
         a = pybamm.Symbol("a")
         x = np.linspace(0, 1, 200)
         interp = pybamm.Interpolant(x, x, a, "name")
-        self.assertEqual(interp.name, "name")
+        assert interp.name == "name"
         interp = pybamm.Interpolant(x, x, a)
-        self.assertEqual(interp.name, "interpolating_function")
+        assert interp.name == "interpolating_function"
 
     def test_diff(self):
         x = np.linspace(0, 1, 200)
@@ -312,18 +325,22 @@ class TestInterpolant(TestCase):
             interp_diff = pybamm.Interpolant(
                 x, 2 * x, y, interpolator=interpolator
             ).diff(y)
-            np.testing.assert_array_almost_equal(
-                interp_diff.evaluate(y=np.array([0.397, 1.5]))[:, 0], np.array([2, 2])
+            np.testing.assert_allclose(
+                interp_diff.evaluate(y=np.array([0.397, 1.5]))[:, 0],
+                np.array([2, 2]),
+                rtol=1e-7,
+                atol=1e-6,
             )
         # square (derivative should be 2*x)
         for interpolator in ["cubic", "pchip"]:
             interp_diff = pybamm.Interpolant(
                 x, x**2, y, interpolator=interpolator
             ).diff(y)
-            np.testing.assert_array_almost_equal(
+            np.testing.assert_allclose(
                 interp_diff.evaluate(y=np.array([0.397, 0.806]))[:, 0],
                 np.array([0.794, 1.612]),
-                decimal=3,
+                rtol=1e-4,
+                atol=1e-3,
             )
 
         # test 2D interpolation diff fails
@@ -334,9 +351,9 @@ class TestInterpolant(TestCase):
         var2 = pybamm.StateVector(slice(1, 2))
         # linear
         interp = pybamm.Interpolant(x, z, (var1, var2), interpolator="linear")
-        with self.assertRaisesRegex(
+        with pytest.raises(
             NotImplementedError,
-            "differentiation not implemented for functions with more than one child",
+            match="differentiation not implemented for functions with more than one child",
         ):
             interp.diff(var1)
 
@@ -345,16 +362,16 @@ class TestInterpolant(TestCase):
         y = pybamm.StateVector(slice(0, 2))
         interp = pybamm.Interpolant(x, 2 * x, y)
 
-        self.assertEqual(interp, interp.create_copy())
+        assert interp == interp.create_copy()
 
-    def test_to_from_json(self):
+    def test_to_from_json(self, mocker):
         x = np.linspace(0, 1, 10)
         y = pybamm.StateVector(slice(0, 2))
         interp = pybamm.Interpolant(x, 2 * x, y)
 
         expected_json = {
             "name": "interpolating_function",
-            "id": mock.ANY,
+            "id": mocker.ANY,
             "x": [
                 [
                     0.0,
@@ -387,11 +404,11 @@ class TestInterpolant(TestCase):
         }
 
         # check correct writing to json
-        self.assertEqual(interp.to_json(), expected_json)
+        assert interp.to_json() == expected_json
 
         expected_json["children"] = [y]
         # check correct re-creation
-        self.assertEqual(pybamm.Interpolant._from_json(expected_json), interp)
+        assert pybamm.Interpolant._from_json(expected_json) == interp
 
         # test to_from_json for 2d x & y
         x = (np.arange(-5.01, 5.01, 0.05), np.arange(-5.01, 5.01, 0.01))
@@ -405,14 +422,4 @@ class TestInterpolant(TestCase):
         interp2d_json = interp.to_json()
         interp2d_json["children"] = (var1, var2)
 
-        self.assertEqual(pybamm.Interpolant._from_json(interp2d_json), interp)
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()
+        assert pybamm.Interpolant._from_json(interp2d_json) == interp

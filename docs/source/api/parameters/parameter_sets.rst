@@ -9,7 +9,7 @@ Parameters Sets
 PyBaMM provides :ref:`pre-defined parameters <bundled-parameter-sets>` for common
 chemistries, as well as, a growing set of :ref:`third-party parameter sets <third-party-parameter-sets>`.
 
-.. autoclass:: pybamm.parameters.parameter_sets.ParameterSets
+.. autoclass:: pybamm.dispatch.entry_points.EntryPoint
     :members:
 
 .. _adding-parameter-sets:
@@ -33,7 +33,7 @@ package (``cell_parameters``) should consist of the following::
 The actual parameter set is defined within ``cell_alpha.py``, as shown below.
 For an example, see the `Marquis2019`_ parameter sets.
 
-.. _Marquis2019: https://github.com/pybamm-team/PyBaMM/blob/develop/pybamm/input/parameters/lithium_ion/Marquis2019.py
+.. _Marquis2019: https://github.com/pybamm-team/PyBaMM/blob/develop/src/pybamm/input/parameters/lithium_ion/Marquis2019.py
 
 .. code-block:: python
     :linenos:

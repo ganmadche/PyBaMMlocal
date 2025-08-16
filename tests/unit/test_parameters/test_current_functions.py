@@ -1,24 +1,25 @@
 #
 # Tests for current input functions
 #
-from tests import TestCase
-import pybamm
+
 import numbers
-import unittest
+
 import numpy as np
 import pandas as pd
 import pytest
+
+import pybamm
 from tests import no_internet_connection
 
 
-class TestCurrentFunctions(TestCase):
+class TestCurrentFunctions:
     def test_constant_current(self):
         # test simplify
         param = pybamm.electrical_parameters
         current = param.current_with_time
         parameter_values = pybamm.ParameterValues({"Current function [A]": 2})
         processed_current = parameter_values.process_symbol(current)
-        self.assertIsInstance(processed_current, pybamm.Scalar)
+        assert isinstance(processed_current, pybamm.Scalar)
 
     @pytest.mark.skipif(
         no_internet_connection(),
@@ -78,8 +79,8 @@ class TestCurrentFunctions(TestCase):
 
         # check output correct value
         time = np.linspace(0, 3600, 600)
-        np.testing.assert_array_almost_equal(
-            user_current(time), 5 * np.sin(2 * np.pi * 3 * time)
+        np.testing.assert_allclose(
+            user_current(time), 5 * np.sin(2 * np.pi * 3 * time), rtol=1e-7, atol=1e-6
         )
 
 
@@ -99,13 +100,3 @@ class StandardCurrentFunctionTests:
 
     def test_all(self):
         self.test_output_type()
-
-
-if __name__ == "__main__":
-    print("Add -v for more debug output")
-    import sys
-
-    if "-v" in sys.argv:
-        debug = True
-    pybamm.settings.debug_mode = True
-    unittest.main()
