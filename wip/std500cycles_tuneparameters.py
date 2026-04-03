@@ -16,13 +16,13 @@ parameter_values.update({"EC diffusivity [m2.s-1]": ec_diffusivity})
 #sei parameters update
 parameter_values.update({"SEI kinetic rate constant [m.s-1]": 1e-12*0.002*0.5}) 
 parameter_values.update({"SEI growth activation energy [J.mol-1]": 48000.0,
-                         "SEI partial molar volume [m3.mol-1]": 9.585e-05*0.4,
+                         "SEI partial molar volume [m3.mol-1]": 9.585e-05*0.35,
                          "SEI resistivity [Ohm.m]": 200000.0
                          })  
 # LAM parameters update
 
 parameter_values.update({"Positive electrode LAM constant proportional term [s-1]": 0.1*0.5*1.5/3600,
-                         "Negative electrode LAM constant proportional term [s-1]": 0.2*0.5*1.5/3600,
+                         "Negative electrode LAM constant proportional term [s-1]": 0.17*0.5*1.5/3600,
                          
                          "Positive electrode LAM constant exponential term": 2.0*1.1,
                          "Negative electrode LAM constant exponential term": 2.0*1.1,
