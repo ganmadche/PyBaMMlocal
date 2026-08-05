@@ -35,8 +35,8 @@ parameter_values.update({"Positive electrode LAM constant proportional term [s-1
 
 #Plating paremeters update
 parameter_values.update({
-                        "Lithium plating kinetic rate constant [m.s-1]": 300*5*1e-09*0.001,
+                        "Lithium plating kinetic rate constant [m.s-1]": 100*5*1e-09*0.001,
                         "Lithium plating transfer coefficient": 0.65,
-                        "Dead lithium decay constant [s-1]": 4e-05,
+                        "Dead lithium decay constant [s-1]": 3e-05,
                         
                         })
